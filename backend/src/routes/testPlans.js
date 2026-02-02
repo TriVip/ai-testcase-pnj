@@ -1,0 +1,137 @@
+import express from 'express';
+import TestPlan from '../models/TestPlan.js';
+import { isAuthenticated } from '../middleware/auth.js';
+
+const router = express.Router();
+
+// All routes require authentication
+router.use(isAuthenticated);
+
+// @route   GET /api/testplans
+// @desc    Get all test plans for current user
+router.get('/', async (req, res) => {
+    try {
+        const testPlans = await TestPlan.find({ user: req.userId })
+            .populate('testCases')
+            .sort({ createdAt: -1 });
+        res.json(testPlans);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// @route   GET /api/testplans/:id
+// @desc    Get single test plan
+router.get('/:id', async (req, res) => {
+    try {
+        const testPlan = await TestPlan.findOne({ _id: req.params.id, user: req.userId }).populate(
+            'testCases'
+        );
+
+        if (!testPlan) {
+            return res.status(404).json({ message: 'Test plan not found' });
+        }
+
+        res.json(testPlan);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// @route   POST /api/testplans
+// @desc    Create new test plan
+router.post('/', async (req, res) => {
+    try {
+        const testPlan = await TestPlan.create({
+            ...req.body,
+            user: req.userId,
+        });
+
+        res.status(201).json(testPlan);
+    } catch (error) {
+        res.status(400).json({ message: 'Failed to create test plan', error: error.message });
+    }
+});
+
+// @route   PUT /api/testplans/:id
+// @desc    Update test plan
+router.put('/:id', async (req, res) => {
+    try {
+        const testPlan = await TestPlan.findOneAndUpdate(
+            { _id: req.params.id, user: req.userId },
+            req.body,
+            { new: true, runValidators: true }
+        ).populate('testCases');
+
+        if (!testPlan) {
+            return res.status(404).json({ message: 'Test plan not found' });
+        }
+
+        res.json(testPlan);
+    } catch (error) {
+        res.status(400).json({ message: 'Failed to update test plan', error: error.message });
+    }
+});
+
+// @route   DELETE /api/testplans/:id
+// @desc    Delete test plan
+router.delete('/:id', async (req, res) => {
+    try {
+        const testPlan = await TestPlan.findOneAndDelete({ _id: req.params.id, user: req.userId });
+
+        if (!testPlan) {
+            return res.status(404).json({ message: 'Test plan not found' });
+        }
+
+        res.json({ message: 'Test plan deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// @route   POST /api/testplans/:id/testcases
+// @desc    Add test case to test plan
+router.post('/:id/testcases', async (req, res) => {
+    try {
+        const { testCaseId } = req.body;
+        const testPlan = await TestPlan.findOne({ _id: req.params.id, user: req.userId });
+
+        if (!testPlan) {
+            return res.status(404).json({ message: 'Test plan not found' });
+        }
+
+        if (!testPlan.testCases.includes(testCaseId)) {
+            testPlan.testCases.push(testCaseId);
+            await testPlan.save();
+        }
+
+        await testPlan.populate('testCases');
+        res.json(testPlan);
+    } catch (error) {
+        res.status(400).json({ message: 'Failed to add test case', error: error.message });
+    }
+});
+
+// @route   DELETE /api/testplans/:id/testcases/:testCaseId
+// @desc    Remove test case from test plan
+router.delete('/:id/testcases/:testCaseId', async (req, res) => {
+    try {
+        const testPlan = await TestPlan.findOne({ _id: req.params.id, user: req.userId });
+
+        if (!testPlan) {
+            return res.status(404).json({ message: 'Test plan not found' });
+        }
+
+        testPlan.testCases = testPlan.testCases.filter(
+            (tc) => tc.toString() !== req.params.testCaseId
+        );
+        await testPlan.save();
+        await testPlan.populate('testCases');
+
+        res.json(testPlan);
+    } catch (error) {
+        res.status(400).json({ message: 'Failed to remove test case', error: error.message });
+    }
+});
+
+export default router;
