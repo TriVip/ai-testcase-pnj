@@ -28,6 +28,15 @@ const testPlanSchema = new mongoose.Schema(
         endDate: {
             type: Date,
         },
+        executionStatus: {
+            type: String,
+            enum: ['Pending', 'Pass', 'Failed'],
+            default: 'Pending',
+        },
+        executionNotes: {
+            type: String,
+            default: '',
+        },
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',

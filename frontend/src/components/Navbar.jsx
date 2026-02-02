@@ -1,14 +1,23 @@
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogoClick = () => {
+        navigate('/dashboard');
+    };
 
     return (
         <nav className="glass sticky top-0 z-50 border-b border-white/20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     {/* Logo */}
-                    <div className="flex items-center space-x-3">
+                    <div
+                        className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity duration-200"
+                        onClick={handleLogoClick}
+                    >
                         <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-accent-600 rounded-lg flex items-center justify-center">
                             <span className="text-white font-bold text-xl">AI</span>
                         </div>

@@ -12,6 +12,7 @@ const TestPlans = () => {
     const [showAIModal, setShowAIModal] = useState(false);
     const [editingTestPlan, setEditingTestPlan] = useState(null);
     const [selectedPlan, setSelectedPlan] = useState(null);
+    const [editingExecution, setEditingExecution] = useState(null);
 
     useEffect(() => {
         fetchTestPlans();
@@ -52,6 +53,25 @@ const TestPlans = () => {
         fetchTestPlans();
     };
 
+    const handleUpdateExecution = async (testPlanId, executionStatus, executionNotes) => {
+        try {
+            await testPlansAPI.update(testPlanId, {
+                executionStatus,
+                executionNotes,
+            });
+            setEditingExecution(null);
+            fetchTestPlans();
+            if (selectedPlan?._id === testPlanId) {
+                const response = await testPlansAPI.getAll();
+                const updated = response.data.find(p => p._id === testPlanId);
+                if (updated) setSelectedPlan(updated);
+            }
+        } catch (error) {
+            console.error('Failed to update execution result:', error);
+            alert('Failed to update execution result');
+        }
+    };
+
     const handleExport = (testPlan) => {
         exportTestPlanToXLSX(testPlan, `${testPlan.name.replace(/\s+/g, '-')}.xlsx`);
     };
@@ -64,6 +84,26 @@ const TestPlans = () => {
             'On Hold': 'bg-gray-100 text-gray-800',
         };
         return colors[status] || 'bg-gray-100 text-gray-800';
+    };
+
+    const getExecutionBadge = (status) => {
+        const badges = {
+            Pass: 'bg-green-100 text-green-800',
+            Failed: 'bg-red-100 text-red-800',
+            Pending: 'bg-gray-100 text-gray-600',
+        };
+        return badges[status] || badges.Pending;
+    };
+
+    const getTestCaseStats = (plan) => {
+        if (!plan.testCases || plan.testCases.length === 0) {
+            return { pass: 0, failed: 0, pending: 0 };
+        }
+        return {
+            pass: plan.testCases.filter(tc => tc.executionStatus === 'Pass').length,
+            failed: plan.testCases.filter(tc => tc.executionStatus === 'Failed').length,
+            pending: plan.testCases.filter(tc => tc.executionStatus === 'Pending').length,
+        };
     };
 
     if (loading) {
@@ -93,7 +133,7 @@ const TestPlans = () => {
                             onClick={() => setShowAIModal(true)}
                             className="btn-secondary flex items-center space-x-2"
                         >
-                            <span>🚀</span>
+                            <i className="fi fi-tr-rocket-lunch"></i>
                             <span>AI Test Plan</span>
                         </button>
                         <button
@@ -108,7 +148,7 @@ const TestPlans = () => {
                 {/* Test Plans List */}
                 {testPlans.length === 0 ? (
                     <div className="card text-center py-12">
-                        <div className="text-6xl mb-4">📋</div>
+                        <div className="text-6xl mb-4"><i className="fi fi-tr-clipboard-list text-primary-600"></i></div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">No test plans yet</h3>
                         <p className="text-gray-600 mb-6">Create your first test plan to organize your test cases</p>
                         <button onClick={() => setShowForm(true)} className="btn-primary">
@@ -133,13 +173,13 @@ const TestPlans = () => {
                                             onClick={() => handleEdit(plan)}
                                             className="text-blue-600 hover:text-blue-800"
                                         >
-                                            ✏️
+                                            <i className="fi fi-tr-pen-clip"></i>
                                         </button>
                                         <button
                                             onClick={() => handleDelete(plan._id)}
                                             className="text-red-600 hover:text-red-800"
                                         >
-                                            🗑️
+                                            <i className="fi fi-tr-trash-xmark"></i>
                                         </button>
                                     </div>
                                 </div>
@@ -148,10 +188,27 @@ const TestPlans = () => {
                                     <span className={`badge ${getStatusColor(plan.status)}`}>
                                         {plan.status}
                                     </span>
+                                    <span className={`badge ${getExecutionBadge(plan.executionStatus)}`}>
+                                        {plan.executionStatus === 'Pass' && <i className="fi fi-tr-check-circle"></i>}
+                                        {plan.executionStatus === 'Failed' && <i className="fi fi-tr-circle-xmark"></i>}
+                                        {plan.executionStatus === 'Pending' && <i className="fi fi-tr-clock-three"></i>}
+                                        {' '}{plan.executionStatus}
+                                    </span>
                                     <span className="text-sm text-gray-600">
                                         {plan.testCases?.length || 0} test cases
                                     </span>
                                 </div>
+
+                                {(() => {
+                                    const stats = getTestCaseStats(plan);
+                                    return stats.pass + stats.failed + stats.pending > 0 && (
+                                        <div className="flex gap-2 mb-4 text-xs">
+                                            <span className="text-green-600"><i className="fi fi-tr-check-circle"></i> {stats.pass}</span>
+                                            <span className="text-red-600"><i className="fi fi-tr-circle-xmark"></i> {stats.failed}</span>
+                                            <span className="text-gray-600"><i className="fi fi-tr-clock-three"></i> {stats.pending}</span>
+                                        </div>
+                                    );
+                                })()}
 
                                 {plan.startDate && (
                                     <div className="text-xs text-gray-500 mb-4">
@@ -159,6 +216,60 @@ const TestPlans = () => {
                                         {plan.endDate ? new Date(plan.endDate).toLocaleDateString() : 'Ongoing'}
                                     </div>
                                 )}
+
+                                <div className="border-t pt-3 mt-3">
+                                    {editingExecution === plan._id ? (
+                                        <div className="space-y-2">
+                                            <select
+                                                defaultValue={plan.executionStatus}
+                                                id={`plan-status-${plan._id}`}
+                                                className="input-field text-sm w-full"
+                                            >
+                                                <option value="Pending">Pending</option>
+                                                <option value="Pass">Pass</option>
+                                                <option value="Failed">Failed</option>
+                                            </select>
+                                            <textarea
+                                                defaultValue={plan.executionNotes}
+                                                id={`plan-notes-${plan._id}`}
+                                                placeholder="Add execution notes..."
+                                                className="input-field text-sm w-full"
+                                                rows="2"
+                                            />
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const status = document.getElementById(`plan-status-${plan._id}`).value;
+                                                        const notes = document.getElementById(`plan-notes-${plan._id}`).value;
+                                                        handleUpdateExecution(plan._id, status, notes);
+                                                    }}
+                                                    className="flex-1 px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
+                                                >
+                                                    Save
+                                                </button>
+                                                <button
+                                                    onClick={() => setEditingExecution(null)}
+                                                    className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            {plan.executionNotes && (
+                                                <p className="text-xs text-gray-600 mb-2 italic">"{plan.executionNotes}"</p>
+                                            )}
+                                            <button
+                                                onClick={() => setEditingExecution(plan._id)}
+                                                className="w-full px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm transition-colors mb-2 flex items-center justify-center gap-2"
+                                            >
+                                                <i className="fi fi-tr-pen-square"></i>
+                                                <span>Update Result</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div className="flex space-x-2">
                                     <button
@@ -169,9 +280,10 @@ const TestPlans = () => {
                                     </button>
                                     <button
                                         onClick={() => handleExport(plan)}
-                                        className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
+                                        className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors flex items-center gap-2"
                                     >
-                                        📊 Export
+                                        <i className="fi fi-tr-file-spreadsheet"></i>
+                                        <span>Export</span>
                                     </button>
                                 </div>
                             </div>
@@ -214,9 +326,17 @@ const TestPlans = () => {
                                                         </div>
                                                         <p className="text-sm text-gray-600">{tc.description}</p>
                                                     </div>
-                                                    <span className={`badge ${tc.priority === 'High' ? 'badge-high' : tc.priority === 'Medium' ? 'badge-medium' : 'badge-low'}`}>
-                                                        {tc.priority}
-                                                    </span>
+                                                    <div className="flex flex-col gap-2 items-end">
+                                                        <span className={`badge ${tc.priority === 'High' ? 'badge-high' : tc.priority === 'Medium' ? 'badge-medium' : 'badge-low'}`}>
+                                                            {tc.priority}
+                                                        </span>
+                                                        <span className={`badge ${getExecutionBadge(tc.executionStatus)}`}>
+                                                            {tc.executionStatus === 'Pass' && <i className="fi fi-tr-check-circle"></i>}
+                                                            {tc.executionStatus === 'Failed' && <i className="fi fi-tr-circle-xmark"></i>}
+                                                            {tc.executionStatus === 'Pending' && <i className="fi fi-tr-clock-three"></i>}
+                                                            {' '}{tc.executionStatus}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}

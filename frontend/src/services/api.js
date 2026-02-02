@@ -18,6 +18,20 @@ export const testCasesAPI = {
     create: (data) => api.post('/testcases', data),
     update: (id, data) => api.put(`/testcases/${id}`, data),
     delete: (id) => api.delete(`/testcases/${id}`),
+    importTestCases: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/testcases/import', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
+    downloadTemplate: (format = 'xlsx') => {
+        return api.get(`/testcases/template?format=${format}`, {
+            responseType: 'blob',
+        });
+    },
 };
 
 // Test Plans API

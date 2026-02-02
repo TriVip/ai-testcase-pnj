@@ -33,6 +33,15 @@ const testCaseSchema = new mongoose.Schema(
             default: 'General',
         },
         tags: [String],
+        executionStatus: {
+            type: String,
+            enum: ['Pending', 'Pass', 'Failed'],
+            default: 'Pending',
+        },
+        executionNotes: {
+            type: String,
+            default: '',
+        },
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
