@@ -42,9 +42,7 @@ const Login = () => {
                 <div className="card animate-slide-up">
                     {/* Logo */}
                     <div className="flex justify-center mb-6">
-                        <div className="w-20 h-20 bg-gradient-to-br from-primary-600 to-accent-600 rounded-2xl flex items-center justify-center animate-float">
-                            <span className="text-white font-bold text-3xl">AI</span>
-                        </div>
+                        <img src="/logo.png" alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain', mixBlendMode: 'multiply' }} />
                     </div>
 
                     {/* Title */}

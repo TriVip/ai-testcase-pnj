@@ -44,9 +44,9 @@ const IconSun = () => (
 );
 
 const NAV_ITEMS = [
-    { to: '/dashboard', label: 'Dashboard', icon: <IconDashboard />, shortcut: '⌘1' },
-    { to: '/testcases', label: 'Test Cases', icon: <IconTestCases />, shortcut: '⌘2' },
-    { to: '/testplans', label: 'Test Plans', icon: <IconTestPlans />, shortcut: '⌘3' },
+    { to: '/dashboard', label: 'Dashboard', icon: <IconDashboard /> },
+    { to: '/testcases', label: 'Test Cases', icon: <IconTestCases /> },
+    { to: '/testplans', label: 'Test Plans', icon: <IconTestPlans /> },
 ];
 
 const Sidebar = () => {
@@ -75,7 +75,7 @@ const Sidebar = () => {
         <aside className="sidebar">
             {/* Logo */}
             <div className="sidebar-logo">
-                <div className="sidebar-logo-icon">QA</div>
+                <img src="/logo.png" alt="Logo" style={{ width: 52, height: 52, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.4))' }} />
                 <span className="sidebar-logo-text">QA Manager</span>
             </div>
 
@@ -92,7 +92,6 @@ const Sidebar = () => {
                     >
                         <span className="sidebar-item-icon">{item.icon}</span>
                         <span>{item.label}</span>
-                        <kbd className="sidebar-item-shortcut">{item.shortcut}</kbd>
                     </NavLink>
                 ))}
             </nav>

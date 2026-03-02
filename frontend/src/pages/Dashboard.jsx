@@ -189,33 +189,7 @@ const Dashboard = () => {
                                     </div>
                                 </div>
 
-                                {/* Keyboard shortcuts hint */}
-                                <div className="panel">
-                                    <div className="panel-header" style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Keyboard Shortcuts</span>
-                                    </div>
-                                    <div className="panel-body" style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                                        {[
-                                            { key: '⌘1', desc: 'Dashboard' },
-                                            { key: '⌘2', desc: 'Test Cases' },
-                                            { key: '⌘3', desc: 'Test Plans' },
-                                            { key: '/', desc: 'Focus search' },
-                                        ].map(s => (
-                                            <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-xs)' }}>
-                                                <span style={{ color: 'var(--text-secondary)' }}>{s.desc}</span>
-                                                <kbd style={{
-                                                    fontFamily: 'var(--font-mono)',
-                                                    fontSize: 10,
-                                                    padding: '1px 5px',
-                                                    background: 'var(--bg-surface-2)',
-                                                    border: '1px solid var(--border-strong)',
-                                                    borderRadius: 'var(--radius-sm)',
-                                                    color: 'var(--text-tertiary)',
-                                                }}>{s.key}</kbd>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+
                             </div>
                         </div>
                     </>
