@@ -18,7 +18,7 @@ const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
         setLoading(true);
         setSuggestions([]);
         setSelectedSuggestions(new Set());
-        
+
         try {
             toast.info('Generating test cases with AI...', 2000);
             const response = await aiAPI.suggestTestCases(featureDescription);
@@ -43,6 +43,15 @@ const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
         setSelectedSuggestions(newSelected);
     };
 
+    const handleSelectAll = () => {
+        const allIndices = new Set(suggestions.map((_, index) => index));
+        setSelectedSuggestions(allIndices);
+    };
+
+    const handleDeselectAll = () => {
+        setSelectedSuggestions(new Set());
+    };
+
     const handleAddSelected = async () => {
         if (selectedSuggestions.size === 0) {
             toast.warning('Please select at least one suggestion');
@@ -52,7 +61,7 @@ const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
         setLoading(true);
         try {
             toast.info(`Adding ${selectedSuggestions.size} test cases...`, 2000);
-            
+
             const promises = Array.from(selectedSuggestions).map(index => {
                 const suggestion = suggestions[index];
                 return testCasesAPI.create({
@@ -86,142 +95,134 @@ const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
     return (
         <>
             <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="glass rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
+            <div
+                className="modal-backdrop"
+                onClick={onClose}
+            >
+                <div
+                    className="modal"
+                    style={{ maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="modal-header">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-900">🤖 AI Test Case Suggestions</h2>
-                            <p className="text-gray-600 mt-1">Describe your feature and let AI generate test cases</p>
+                            <h2 className="modal-title">AI Test Case Suggestions</h2>
+                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 2 }}>Describe your feature and let AI generate test cases</p>
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="text-gray-500 hover:text-gray-700 text-2xl"
-                        >
-                            ×
-                        </button>
-                    </div>
-                </div>
-
-                <div className="p-6 overflow-y-auto flex-1">
-                    {/* Input Section */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Feature Description
-                        </label>
-                        <textarea
-                            value={featureDescription}
-                            onChange={(e) => setFeatureDescription(e.target.value)}
-                            className="input-field"
-                            rows="4"
-                            placeholder="Describe the feature you want to test. For example: 'User login functionality with email and password, including remember me option and forgot password link'"
-                            disabled={loading}
-                        />
-                        <button
-                            onClick={handleGenerate}
-                            className="btn-primary mt-3"
-                            disabled={loading}
-                        >
-                            {loading && suggestions.length === 0 ? (
-                                <span className="flex items-center space-x-2">
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                    <span>Generating...</span>
-                                </span>
-                            ) : (
-                                'Generate Suggestions'
-                            )}
+                        <button onClick={onClose} className="btn btn-ghost btn-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                         </button>
                     </div>
 
-                    {/* Suggestions List */}
-                    {suggestions.length > 0 && (
-                        <div>
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-semibold text-gray-900">
-                                    Generated Suggestions ({suggestions.length})
-                                </h3>
-                                <span className="text-sm text-gray-600">
-                                    {selectedSuggestions.size} selected
-                                </span>
+                    <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+                        {/* Input Section */}
+                        <div className="form-group">
+                            <label className="form-label">Feature Description</label>
+                            <textarea
+                                value={featureDescription}
+                                onChange={(e) => setFeatureDescription(e.target.value)}
+                                className="input-field"
+                                rows="3"
+                                placeholder="Describe the feature you want to test. E.g. 'User login with email/password, remember me, forgot password'"
+                                disabled={loading}
+                            />
+                            <div style={{ marginTop: 'var(--space-3)' }}>
+                                <button
+                                    onClick={handleGenerate}
+                                    className="btn btn-primary btn-sm"
+                                    disabled={loading}
+                                >
+                                    {loading && suggestions.length === 0 ? (
+                                        <><div className="spinner" style={{ width: 12, height: 12 }} /> Generating…</>
+                                    ) : (
+                                        <>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                                            Generate Suggestions
+                                        </>
+                                    )}
+                                </button>
                             </div>
+                        </div>
 
-                            <div className="space-y-4">
-                                {suggestions.map((suggestion, index) => (
-                                    <div
-                                        key={index}
-                                        className={`bg-white/50 rounded-lg p-4 cursor-pointer border-2 transition-all ${selectedSuggestions.has(index)
-                                                ? 'border-primary-500 bg-primary-50/50'
-                                                : 'border-transparent hover:border-gray-300'
-                                            }`}
-                                        onClick={() => toggleSelection(index)}
-                                    >
-                                        <div className="flex items-start space-x-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedSuggestions.has(index)}
-                                                onChange={() => toggleSelection(index)}
-                                                className="mt-1"
-                                            />
-                                            <div className="flex-1">
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <h4 className="font-semibold text-gray-900">{suggestion.title}</h4>
-                                                    <span className={`text-sm font-medium ${getPriorityColor(suggestion.priority)}`}>
-                                                        {suggestion.priority}
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm text-gray-600 mb-3">{suggestion.description}</p>
+                        {/* Suggestions List */}
+                        {suggestions.length > 0 && (
+                            <div style={{ marginTop: 'var(--space-6)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Generated Suggestions ({suggestions.length})</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{selectedSuggestions.size} selected</span>
+                                        <button onClick={handleSelectAll} className="btn btn-ghost btn-sm" disabled={selectedSuggestions.size === suggestions.length}>Select All</button>
+                                        <button onClick={handleDeselectAll} className="btn btn-ghost btn-sm" disabled={selectedSuggestions.size === 0}>Deselect All</button>
+                                    </div>
+                                </div>
 
-                                                {suggestion.steps && suggestion.steps.length > 0 && (
-                                                    <div className="bg-white/70 rounded-lg p-3">
-                                                        <p className="text-xs font-medium text-gray-700 mb-2">Test Steps:</p>
-                                                        <ol className="text-sm text-gray-600 space-y-1">
-                                                            {suggestion.steps.map((step, stepIndex) => (
-                                                                <li key={stepIndex} className="text-xs">
-                                                                    <span className="font-medium">{stepIndex + 1}.</span> {step.action}
-                                                                    {step.expectedResult && (
-                                                                        <span className="text-gray-500"> → {step.expectedResult}</span>
-                                                                    )}
-                                                                </li>
-                                                            ))}
-                                                        </ol>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                                    {suggestions.map((suggestion, index) => (
+                                        <div
+                                            key={index}
+                                            style={{
+                                                background: selectedSuggestions.has(index) ? 'var(--brand-light)' : 'var(--bg-surface-2)',
+                                                borderRadius: 'var(--radius)',
+                                                padding: 'var(--space-3) var(--space-4)',
+                                                cursor: 'pointer',
+                                                border: `2px solid ${selectedSuggestions.has(index) ? 'var(--brand-muted)' : 'transparent'}`,
+                                                transition: 'border-color var(--transition), background var(--transition)',
+                                            }}
+                                            onClick={() => toggleSelection(index)}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedSuggestions.has(index)}
+                                                    onChange={() => toggleSelection(index)}
+                                                    style={{ marginTop: 3, cursor: 'pointer', flexShrink: 0 }}
+                                                />
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-1)' }}>
+                                                        <h4 style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{suggestion.title}</h4>
+                                                        <span className={`status-tag prio-${suggestion.priority?.toLowerCase()}`}>{suggestion.priority}</span>
                                                     </div>
-                                                )}
+                                                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-2)', lineHeight: 1.5 }}>{suggestion.description}</p>
 
-                                                {suggestion.category && (
-                                                    <span className="inline-block mt-2 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                                        {suggestion.category}
-                                                    </span>
-                                                )}
+                                                    {suggestion.steps?.length > 0 && (
+                                                        <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-2) var(--space-3)', marginBottom: 'var(--space-2)' }}>
+                                                            <p style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Steps</p>
+                                                            {suggestion.steps.map((step, si) => (
+                                                                <div key={si} style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginBottom: 2 }}>
+                                                                    <span style={{ fontWeight: 600 }}>{si + 1}.</span> {step.action}
+                                                                    {step.expectedResult && <span style={{ color: 'var(--text-tertiary)' }}> → {step.expectedResult}</span>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {suggestion.category && (
+                                                        <span className="status-tag status-pending">{suggestion.category}</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    {suggestions.length > 0 && (
+                        <div className="modal-footer">
+                            <button onClick={onClose} className="btn btn-secondary btn-sm" disabled={loading}>Cancel</button>
+                            <button
+                                onClick={handleAddSelected}
+                                className="btn btn-primary btn-sm"
+                                disabled={loading || selectedSuggestions.size === 0}
+                            >
+                                {loading ? 'Adding…' : `Add Selected (${selectedSuggestions.size})`}
+                            </button>
                         </div>
                     )}
                 </div>
-
-                {/* Footer */}
-                {suggestions.length > 0 && (
-                    <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
-                        <button
-                            onClick={onClose}
-                            className="btn-secondary"
-                            disabled={loading}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleAddSelected}
-                            className="btn-primary"
-                            disabled={loading || selectedSuggestions.size === 0}
-                        >
-                            {loading ? 'Adding...' : `Add Selected (${selectedSuggestions.size})`}
-                        </button>
-                    </div>
-                )}
             </div>
-        </div>
         </>
     );
 };

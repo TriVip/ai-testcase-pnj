@@ -10,10 +10,10 @@ const PrivateRoute = ({ children }) => {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app)' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div className="spinner spinner-lg" style={{ margin: '0 auto' }} />
+                    <p style={{ marginTop: 12, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Loading…</p>
                 </div>
             </div>
         );

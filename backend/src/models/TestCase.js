@@ -32,6 +32,10 @@ const testCaseSchema = new mongoose.Schema(
             type: String,
             default: 'General',
         },
+        feature: {
+            type: String,
+            default: 'General',
+        },
         tags: [String],
         executionStatus: {
             type: String,

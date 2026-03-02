@@ -34,3 +34,5 @@ coverage/
 
 # Markdown
 *.md
+
+.playwright-mcp/

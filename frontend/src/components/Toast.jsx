@@ -1,108 +1,85 @@
 import { useEffect, useState } from 'react';
 
-const Toast = ({ message, type = 'success', duration = 3000, onClose }) => {
-    const [isVisible, setIsVisible] = useState(true);
+const ICONS = {
+    success: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--status-pass)', flexShrink: 0, marginTop: 1 }}>
+            <polyline points="20 6 9 17 4 12" />
+        </svg>
+    ),
+    error: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--status-fail)', flexShrink: 0, marginTop: 1 }}>
+            <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+    ),
+    warning: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--status-warn)', flexShrink: 0, marginTop: 1 }}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+    ),
+    info: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--brand)', flexShrink: 0, marginTop: 1 }}>
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+    ),
+};
+
+const TYPE_CLASS = {
+    success: 'toast-success',
+    error: 'toast-error',
+    warning: 'toast-warn',
+    info: 'toast-info',
+};
+
+const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
+    const [visible, setVisible] = useState(true);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsVisible(false);
-            setTimeout(onClose, 300); // Wait for fade out animation
+        const t = setTimeout(() => {
+            setVisible(false);
+            setTimeout(onClose, 250);
         }, duration);
-
-        return () => clearTimeout(timer);
+        return () => clearTimeout(t);
     }, [duration, onClose]);
-
-    const getTypeStyles = () => {
-        switch (type) {
-            case 'success':
-                return 'bg-green-500 text-white';
-            case 'error':
-                return 'bg-red-500 text-white';
-            case 'warning':
-                return 'bg-yellow-500 text-white';
-            case 'info':
-                return 'bg-blue-500 text-white';
-            default:
-                return 'bg-gray-800 text-white';
-        }
-    };
-
-    const getIcon = () => {
-        switch (type) {
-            case 'success':
-                return '✅';
-            case 'error':
-                return '❌';
-            case 'warning':
-                return '⚠️';
-            case 'info':
-                return 'ℹ️';
-            default:
-                return '📢';
-        }
-    };
 
     return (
         <div
-            className={`fixed bottom-6 right-6 z-[100] transition-all duration-300 transform ${
-                isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-            }`}
+            className={`toast ${TYPE_CLASS[type] || 'toast-info'}`}
+            style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateX(0)' : 'translateX(16px)', transition: 'opacity 200ms, transform 200ms' }}
         >
-            <div className={`${getTypeStyles()} rounded-lg shadow-lg px-6 py-4 flex items-center space-x-3 min-w-[300px] max-w-md`}>
-                <span className="text-2xl">{getIcon()}</span>
-                <p className="flex-1 font-medium">{message}</p>
-                <button
-                    onClick={() => {
-                        setIsVisible(false);
-                        setTimeout(onClose, 300);
-                    }}
-                    className="text-white/80 hover:text-white text-xl"
-                >
-                    ×
-                </button>
-            </div>
+            {ICONS[type]}
+            <span className="toast-msg">{message}</span>
+            <button
+                onClick={() => { setVisible(false); setTimeout(onClose, 250); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, lineHeight: 0, flexShrink: 0 }}
+            >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
         </div>
     );
 };
 
-// Toast Container component
-export const ToastContainer = ({ toasts, removeToast }) => {
-    return (
-        <div className="fixed bottom-6 right-6 z-[100] space-y-3">
-            {toasts.map((toast) => (
-                <Toast
-                    key={toast.id}
-                    message={toast.message}
-                    type={toast.type}
-                    duration={toast.duration}
-                    onClose={() => removeToast(toast.id)}
-                />
-            ))}
-        </div>
-    );
-};
+export const ToastContainer = ({ toasts, removeToast }) => (
+    <div className="toast-container">
+        {toasts.map(t => (
+            <Toast key={t.id} message={t.message} type={t.type} duration={t.duration} onClose={() => removeToast(t.id)} />
+        ))}
+    </div>
+);
 
-// Custom hook for using toasts
 export const useToast = () => {
     const [toasts, setToasts] = useState([]);
-
-    const addToast = (message, type = 'success', duration = 3000) => {
-        const id = Date.now();
-        setToasts((prev) => [...prev, { id, message, type, duration }]);
+    const add = (message, type = 'info', duration = 3000) => {
+        const id = Date.now() + Math.random();
+        setToasts(prev => [...prev, { id, message, type, duration }]);
     };
-
-    const removeToast = (id) => {
-        setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    };
-
+    const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
     return {
         toasts,
-        addToast,
         removeToast,
-        success: (message, duration) => addToast(message, 'success', duration),
-        error: (message, duration) => addToast(message, 'error', duration),
-        warning: (message, duration) => addToast(message, 'warning', duration),
-        info: (message, duration) => addToast(message, 'info', duration),
+        success: (msg, dur) => add(msg, 'success', dur),
+        error: (msg, dur) => add(msg, 'error', dur),
+        warning: (msg, dur) => add(msg, 'warning', dur),
+        info: (msg, dur) => add(msg, 'info', dur),
     };
 };
 

@@ -1,100 +1,227 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import Navbar from '../components/Navbar';
+import AppShell from '../components/AppShell';
+import { testCasesAPI, testPlansAPI } from '../services/api';
 
 const Dashboard = () => {
     const { user } = useAuth();
+    const [stats, setStats] = useState(null);
+    const [recentTCs, setRecentTCs] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const [tcRes, plansRes] = await Promise.all([
+                    testCasesAPI.getAll(),
+                    testPlansAPI.getAll(),
+                ]);
+                const tcs = tcRes.data || [];
+                const plans = plansRes.data || [];
+
+                const pass = tcs.filter(t => t.executionStatus === 'Pass').length;
+                const failed = tcs.filter(t => t.executionStatus === 'Failed').length;
+                const pending = tcs.filter(t => t.executionStatus === 'Pending').length;
+                const activePlans = plans.filter(p => p.status === 'In Progress' || p.status === 'Planning').length;
+                const passRate = tcs.length > 0 ? Math.round((pass / tcs.length) * 100) : 0;
+
+                setStats({ total: tcs.length, pass, failed, pending, passRate, activePlans, totalPlans: plans.length });
+                // Recent: last 8 TCs sorted by updatedAt or createdAt
+                const sorted = [...tcs].sort((a, b) =>
+                    new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)
+                );
+                setRecentTCs(sorted.slice(0, 8));
+            } catch {
+                setStats({ total: 0, pass: 0, failed: 0, pending: 0, passRate: 0, activePlans: 0, totalPlans: 0 });
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, []);
+
+    const fmtDate = (d) => {
+        if (!d) return '—';
+        const dt = new Date(d);
+        return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const StatusDot = ({ status }) => {
+        const map = {
+            Pass: 'var(--status-pass)',
+            Failed: 'var(--status-fail)',
+            Pending: 'var(--status-pending)',
+        };
+        return <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: map[status] || map.Pending, marginRight: 4 }} />;
+    };
 
     return (
-        <div className="min-h-screen">
-            <Navbar />
-
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                {/* Welcome Section */}
-                <div className="mb-12 animate-slide-down">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                        Welcome back, {user?.name?.split(' ')[0]}! 👋
-                    </h1>
-                    <p className="text-gray-600">
-                        Manage your test cases and plans with AI-powered assistance
+        <AppShell>
+            <div className="page-inner">
+                {/* Page header */}
+                <div style={{ marginBottom: 'var(--space-6)' }}>
+                    <h1 className="page-title">Dashboard</h1>
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
+                        Overview for {user?.name || 'QA Team'}
                     </p>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                    <Link to="/testcases" className="card group hover:scale-105 transition-transform duration-300">
-                        <div className="flex items-start space-x-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-xl font-semibold text-gray-900 mb-2">Test Cases</h3>
-                                <p className="text-gray-600 mb-4">
-                                    Create, edit, and manage your test cases with AI suggestions
-                                </p>
-                                <span className="text-primary-600 font-medium group-hover:underline">
-                                    Go to Test Cases →
-                                </span>
-                            </div>
-                        </div>
-                    </Link>
-
-                    <Link to="/testplans" className="card group hover:scale-105 transition-transform duration-300">
-                        <div className="flex items-start space-x-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                </svg>
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-xl font-semibold text-gray-900 mb-2">Test Plans</h3>
-                                <p className="text-gray-600 mb-4">
-                                    Organize test cases into comprehensive test plans
-                                </p>
-                                <span className="text-accent-600 font-medium group-hover:underline">
-                                    Go to Test Plans →
-                                </span>
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-
-                {/* Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="card text-center">
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                            <span className="text-2xl">🤖</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900 mb-2">AI-Powered</h4>
-                        <p className="text-sm text-gray-600">
-                            Generate test cases automatically using OpenAI
-                        </p>
+                {loading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
+                        <div className="spinner" /> Loading metrics…
                     </div>
+                ) : (
+                    <>
+                        {/* KPI Strip */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                            gap: 'var(--space-4)',
+                            marginBottom: 'var(--space-8)',
+                        }}>
+                            <div className="kpi-tile">
+                                <div className="kpi-label">Total Test Cases</div>
+                                <div className="kpi-value">{stats.total}</div>
+                                <div className="kpi-delta" style={{ marginTop: 2 }}>
+                                    <span style={{ color: 'var(--status-pass-text)' }}>{stats.pass} pass</span>
+                                    {' · '}
+                                    <span style={{ color: 'var(--status-fail-text)' }}>{stats.failed} fail</span>
+                                    {' · '}
+                                    <span>{stats.pending} pending</span>
+                                </div>
+                            </div>
 
-                    <div className="card text-center">
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                            <span className="text-2xl">📊</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900 mb-2">Export to Excel</h4>
-                        <p className="text-sm text-gray-600">
-                            Download your test cases in XLSX format
-                        </p>
-                    </div>
+                            <div className="kpi-tile" style={{ borderTopColor: stats.passRate >= 80 ? 'var(--status-pass)' : stats.passRate >= 50 ? 'var(--status-warn)' : 'var(--status-fail)', borderTopWidth: 2 }}>
+                                <div className="kpi-label">Pass Rate</div>
+                                <div className="kpi-value" style={{ color: stats.passRate >= 80 ? 'var(--status-pass-text)' : stats.passRate >= 50 ? 'var(--status-warn-text)' : 'var(--status-fail-text)' }}>
+                                    {stats.passRate}%
+                                </div>
+                                <div className="kpi-delta">of {stats.total} executed</div>
+                            </div>
 
-                    <div className="card text-center">
-                        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                            <span className="text-2xl">🔒</span>
+                            <div className="kpi-tile">
+                                <div className="kpi-label">Active Test Plans</div>
+                                <div className="kpi-value">{stats.activePlans}</div>
+                                <div className="kpi-delta">{stats.totalPlans} total plans</div>
+                            </div>
+
+                            <div className="kpi-tile" style={{ borderTopColor: stats.failed > 0 ? 'var(--status-fail)' : 'transparent', borderTopWidth: 2 }}>
+                                <div className="kpi-label">Failed</div>
+                                <div className="kpi-value" style={{ color: stats.failed > 0 ? 'var(--status-fail-text)' : 'var(--text-primary)' }}>{stats.failed}</div>
+                                <div className="kpi-delta">require attention</div>
+                            </div>
                         </div>
-                        <h4 className="font-semibold text-gray-900 mb-2">Secure & Private</h4>
-                        <p className="text-sm text-gray-600">
-                            Your data is protected with Google OAuth
-                        </p>
-                    </div>
-                </div>
+
+                        {/* Two-column content area */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 'var(--space-6)', alignItems: 'start' }}>
+                            {/* Recent Test Cases */}
+                            <div className="panel">
+                                <div className="panel-header">
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)' }}>
+                                        <span style={{ fontSize: 'var(--text-md)', fontWeight: 600 }}>Recent Test Cases</span>
+                                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>last modified</span>
+                                    </div>
+                                    <Link to="/testcases" style={{ fontSize: 'var(--text-sm)', color: 'var(--brand)' }}>
+                                        View all →
+                                    </Link>
+                                </div>
+                                {recentTCs.length === 0 ? (
+                                    <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+                                        <div className="empty-state-title">No test cases yet</div>
+                                        <Link to="/testcases" className="btn btn-primary btn-sm" style={{ marginTop: 'var(--space-3)' }}>
+                                            Create Test Case
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Title</th>
+                                                <th>Priority</th>
+                                                <th>Status</th>
+                                                <th>Modified</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {recentTCs.map(tc => (
+                                                <tr key={tc._id}>
+                                                    <td style={{ maxWidth: 280 }}>
+                                                        <span className="truncate" style={{ display: 'block', fontWeight: 500 }}>{tc.title}</span>
+                                                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{tc.category || '—'}</span>
+                                                    </td>
+                                                    <td><span className={`status-tag prio-${tc.priority?.toLowerCase()}`}>{tc.priority}</span></td>
+                                                    <td>
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                                            <StatusDot status={tc.executionStatus} />
+                                                            <span style={{ fontSize: 'var(--text-xs)' }}>{tc.executionStatus || 'Pending'}</span>
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                                                        {fmtDate(tc.updatedAt || tc.createdAt)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                                <div className="panel">
+                                    <div className="panel-header" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+                                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Quick Actions</span>
+                                    </div>
+                                    <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)' }}>
+                                        <Link to="/testcases" className="btn btn-primary" style={{ justifyContent: 'flex-start' }}>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                                            New Test Case
+                                        </Link>
+                                        <Link to="/testplans" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                                            New Test Plan
+                                        </Link>
+                                        <Link to="/testcases" className="btn btn-ghost" style={{ justifyContent: 'flex-start', fontSize: 'var(--text-sm)' }}>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                                            Import Test Cases
+                                        </Link>
+                                    </div>
+                                </div>
+
+                                {/* Keyboard shortcuts hint */}
+                                <div className="panel">
+                                    <div className="panel-header" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+                                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Keyboard Shortcuts</span>
+                                    </div>
+                                    <div className="panel-body" style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                        {[
+                                            { key: '⌘1', desc: 'Dashboard' },
+                                            { key: '⌘2', desc: 'Test Cases' },
+                                            { key: '⌘3', desc: 'Test Plans' },
+                                            { key: '/', desc: 'Focus search' },
+                                        ].map(s => (
+                                            <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-xs)' }}>
+                                                <span style={{ color: 'var(--text-secondary)' }}>{s.desc}</span>
+                                                <kbd style={{
+                                                    fontFamily: 'var(--font-mono)',
+                                                    fontSize: 10,
+                                                    padding: '1px 5px',
+                                                    background: 'var(--bg-surface-2)',
+                                                    border: '1px solid var(--border-strong)',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    color: 'var(--text-tertiary)',
+                                                }}>{s.key}</kbd>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
-        </div>
+        </AppShell>
     );
 };
 

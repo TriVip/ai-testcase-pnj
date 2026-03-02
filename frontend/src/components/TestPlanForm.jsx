@@ -65,26 +65,33 @@ const TestPlanForm = ({ testPlan, onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="glass rounded-2xl max-w-3xl w-full my-8">
-                <form onSubmit={handleSubmit} className="p-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900">
+        <div
+            className="modal-backdrop"
+            onClick={onClose}
+        >
+            <div
+                className="modal"
+                style={{ maxWidth: 760 }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-header">
+                        <h2 className="modal-title">
                             {testPlan ? 'Edit Test Plan' : 'New Test Plan'}
                         </h2>
                         <button
                             type="button"
                             onClick={onClose}
-                            className="text-gray-500 hover:text-gray-700 text-2xl"
+                            className="btn btn-ghost btn-icon"
                         >
-                            ×
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                         </button>
                     </div>
 
-                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                         {/* Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                        <div className="form-group">
+                            <label className="form-label">Name *</label>
                             <input
                                 type="text"
                                 required
@@ -96,8 +103,8 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                         </div>
 
                         {/* Description */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+                        <div className="form-group">
+                            <label className="form-label">Description *</label>
                             <textarea
                                 required
                                 value={formData.description}
@@ -109,9 +116,9 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                         </div>
 
                         {/* Status, Dates */}
-                        <div className="grid grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                            <div className="form-group">
+                                <label className="form-label">Status</label>
                                 <select
                                     value={formData.status}
                                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -123,8 +130,8 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                                     <option>On Hold</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                            <div className="form-group">
+                                <label className="form-label">Start Date</label>
                                 <input
                                     type="date"
                                     value={formData.startDate}
@@ -132,8 +139,8 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                                     className="input-field"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                            <div className="form-group">
+                                <label className="form-label">End Date</label>
                                 <input
                                     type="date"
                                     value={formData.endDate}
@@ -144,36 +151,32 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                         </div>
 
                         {/* Test Cases Selection */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <div className="form-group">
+                            <label className="form-label">
                                 Test Cases ({formData.testCases.length} selected)
                             </label>
                             {availableTestCases.length === 0 ? (
-                                <p className="text-sm text-gray-500 italic">No test cases available. Create some test cases first.</p>
+                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No test cases available. Create some test cases first.</p>
                             ) : (
-                                <div className="bg-white/50 rounded-lg p-4 max-h-64 overflow-y-auto space-y-2">
+                                <div style={{ background: 'var(--bg-surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: 'var(--space-2)', maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
                                     {availableTestCases.map((tc) => (
                                         <label
                                             key={tc._id}
-                                            className="flex items-start space-x-3 p-3 rounded-lg hover:bg-white/70 cursor-pointer transition-colors"
+                                            style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'background var(--transition)' }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = ''}
                                         >
                                             <input
                                                 type="checkbox"
                                                 checked={formData.testCases.includes(tc._id)}
                                                 onChange={() => toggleTestCase(tc._id)}
-                                                className="mt-1"
+                                                style={{ marginTop: 3, cursor: 'pointer', flexShrink: 0 }}
                                             />
-                                            <div className="flex-1">
-                                                <p className="font-medium text-gray-900">{tc.title}</p>
-                                                <p className="text-sm text-gray-600">{tc.description}</p>
-                                                <div className="flex items-center space-x-2 mt-1">
-                                                    <span className={`text-xs px-2 py-0.5 rounded ${tc.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                            tc.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                                'bg-green-100 text-green-800'
-                                                        }`}>
-                                                        {tc.priority}
-                                                    </span>
-                                                    <span className="text-xs text-gray-500">{tc.category}</span>
+                                            <div style={{ flex: 1 }}>
+                                                <p style={{ fontWeight: 500, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{tc.title}</p>
+                                                <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 3, alignItems: 'center' }}>
+                                                    <span className={`status-tag prio-${tc.priority?.toLowerCase()}`}>{tc.priority}</span>
+                                                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{tc.category}</span>
                                                 </div>
                                             </div>
                                         </label>
@@ -183,22 +186,10 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                         </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="btn-secondary"
-                            disabled={loading}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="btn-primary"
-                            disabled={loading}
-                        >
-                            {loading ? 'Saving...' : testPlan ? 'Update' : 'Create'}
+                    <div className="modal-footer">
+                        <button type="button" onClick={onClose} className="btn btn-secondary btn-sm" disabled={loading}>Cancel</button>
+                        <button type="submit" className="btn btn-primary btn-sm" disabled={loading}>
+                            {loading ? 'Saving…' : testPlan ? 'Update' : 'Create'}
                         </button>
                     </div>
                 </form>

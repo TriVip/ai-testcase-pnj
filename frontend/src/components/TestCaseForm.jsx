@@ -8,6 +8,7 @@ const TestCaseForm = ({ testCase, onClose }) => {
         priority: 'Medium',
         status: 'Draft',
         category: 'General',
+        feature: 'General',
         tags: [],
         steps: [{ stepNumber: 1, action: '', expectedResult: '' }],
     });
@@ -22,6 +23,7 @@ const TestCaseForm = ({ testCase, onClose }) => {
                 priority: testCase.priority || 'Medium',
                 status: testCase.status || 'Draft',
                 category: testCase.category || 'General',
+                feature: testCase.feature || 'General',
                 tags: testCase.tags || [],
                 steps: testCase.steps?.length > 0 ? testCase.steps : [{ stepNumber: 1, action: '', expectedResult: '' }],
             });
@@ -77,26 +79,33 @@ const TestCaseForm = ({ testCase, onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="glass rounded-2xl max-w-3xl w-full my-8">
-                <form onSubmit={handleSubmit} className="p-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900">
+        <div
+            className="modal-backdrop"
+            onClick={onClose}
+        >
+            <div
+                className="modal"
+                style={{ maxWidth: 760 }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-header">
+                        <h2 className="modal-title">
                             {testCase ? 'Edit Test Case' : 'New Test Case'}
                         </h2>
                         <button
                             type="button"
                             onClick={onClose}
-                            className="text-gray-500 hover:text-gray-700 text-2xl"
+                            className="btn btn-ghost btn-icon"
                         >
-                            ×
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                         </button>
                     </div>
 
-                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                         {/* Title */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+                        <div className="form-group">
+                            <label className="form-label">Title *</label>
                             <input
                                 type="text"
                                 required
@@ -108,8 +117,8 @@ const TestCaseForm = ({ testCase, onClose }) => {
                         </div>
 
                         {/* Description */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+                        <div className="form-group">
+                            <label className="form-label">Description *</label>
                             <textarea
                                 required
                                 value={formData.description}
@@ -121,9 +130,9 @@ const TestCaseForm = ({ testCase, onClose }) => {
                         </div>
 
                         {/* Priority, Status, Category */}
-                        <div className="grid grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                            <div className="form-group">
+                                <label className="form-label">Priority</label>
                                 <select
                                     value={formData.priority}
                                     onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
@@ -135,8 +144,8 @@ const TestCaseForm = ({ testCase, onClose }) => {
                                     <option>Critical</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                            <div className="form-group">
+                                <label className="form-label">Status</label>
                                 <select
                                     value={formData.status}
                                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -147,8 +156,8 @@ const TestCaseForm = ({ testCase, onClose }) => {
                                     <option>Deprecated</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                            <div className="form-group">
+                                <label className="form-label">Category</label>
                                 <input
                                     type="text"
                                     value={formData.category}
@@ -159,10 +168,23 @@ const TestCaseForm = ({ testCase, onClose }) => {
                             </div>
                         </div>
 
+                        {/* Feature/Module */}
+                        <div className="form-group">
+                            <label className="form-label">Feature/Module</label>
+                            <input
+                                type="text"
+                                value={formData.feature}
+                                onChange={(e) => setFormData({ ...formData, feature: e.target.value })}
+                                className="input-field"
+                                placeholder="e.g., Login, Checkout, User Profile"
+                            />
+                            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>Used to group test cases in test plans</p>
+                        </div>
+
                         {/* Tags */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-                            <div className="flex space-x-2 mb-2">
+                        <div className="form-group">
+                            <label className="form-label">Tags</label>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
                                 <input
                                     type="text"
                                     value={tagInput}
@@ -174,19 +196,19 @@ const TestCaseForm = ({ testCase, onClose }) => {
                                 <button
                                     type="button"
                                     onClick={addTag}
-                                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                                    className="btn btn-secondary btn-sm"
                                 >
                                     Add
                                 </button>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                                 {formData.tags.map((tag) => (
-                                    <span key={tag} className="badge bg-primary-100 text-primary-800 flex items-center space-x-1">
-                                        <span>{tag}</span>
+                                    <span key={tag} className="status-tag status-pending" style={{ gap: 'var(--space-2)' }}>
+                                        {tag}
                                         <button
                                             type="button"
                                             onClick={() => removeTag(tag)}
-                                            className="text-primary-600 hover:text-primary-800"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, lineHeight: 1 }}
                                         >
                                             ×
                                         </button>
@@ -197,26 +219,27 @@ const TestCaseForm = ({ testCase, onClose }) => {
 
                         {/* Steps */}
                         <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-gray-700">Test Steps</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                                <label className="form-label" style={{ margin: 0 }}>Test Steps</label>
                                 <button
                                     type="button"
                                     onClick={addStep}
-                                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                                    className="btn btn-ghost btn-sm"
                                 >
                                     + Add Step
                                 </button>
                             </div>
-                            <div className="space-y-3">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                                 {formData.steps.map((step, index) => (
-                                    <div key={index} className="bg-white/50 rounded-lg p-4">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-sm font-medium text-gray-700">Step {step.stepNumber}</span>
+                                    <div key={index} style={{ background: 'var(--bg-surface-2)', borderRadius: 'var(--radius)', padding: 'var(--space-3)', border: '1px solid var(--border)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Step {step.stepNumber}</span>
                                             {formData.steps.length > 1 && (
                                                 <button
                                                     type="button"
                                                     onClick={() => removeStep(index)}
-                                                    className="text-red-600 hover:text-red-800 text-sm"
+                                                    className="btn btn-ghost btn-sm"
+                                                    style={{ color: 'var(--status-fail)', fontSize: 'var(--text-xs)' }}
                                                 >
                                                     Remove
                                                 </button>
@@ -242,22 +265,21 @@ const TestCaseForm = ({ testCase, onClose }) => {
                         </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                    <div className="modal-footer">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="btn-secondary"
+                            className="btn btn-secondary btn-sm"
                             disabled={loading}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="btn-primary"
+                            className="btn btn-primary btn-sm"
                             disabled={loading}
                         >
-                            {loading ? 'Saving...' : testCase ? 'Update' : 'Create'}
+                            {loading ? 'Saving…' : testCase ? 'Update' : 'Create'}
                         </button>
                     </div>
                 </form>
