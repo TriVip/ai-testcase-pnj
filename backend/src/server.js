@@ -29,7 +29,6 @@ if (result.error) {
     process.env.NODE_ENV = process.env.NODE_ENV || 'development';
     process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
     process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-    process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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';
     process.env.OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 }
 
