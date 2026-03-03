@@ -47,7 +47,19 @@ export const testPlansAPI = {
 
 // AI API
 export const aiAPI = {
-    suggestTestCases: (featureDescription) => api.post('/ai/suggest-testcases', { featureDescription }),
+    suggestTestCases: (featureDescription, file = null) => {
+        if (file) {
+            const formData = new FormData();
+            formData.append('featureDescription', featureDescription);
+            formData.append('file', file);
+            return api.post('/ai/suggest-testcases', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+        }
+        return api.post('/ai/suggest-testcases', { featureDescription });
+    },
     suggestTestPlan: (projectDescription) => api.post('/ai/suggest-testplan', { projectDescription }),
     improveTestCase: (testCase) => api.post('/ai/improve-testcase', { testCase }),
 };

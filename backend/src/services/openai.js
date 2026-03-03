@@ -12,16 +12,16 @@ const getOpenAIClient = () => {
 const extractJSON = (content) => {
     // Try to find JSON array
     let jsonMatch = content.match(/\[[\s\S]*\]/);
-    
+
     // If not found, try to find JSON object
     if (!jsonMatch) {
         jsonMatch = content.match(/\{[\s\S]*\}/);
     }
-    
+
     if (!jsonMatch) {
         throw new Error('Failed to extract JSON from OpenAI response');
     }
-    
+
     return JSON.parse(jsonMatch[0]);
 };
 
@@ -33,7 +33,7 @@ export const generateTestCaseSuggestions = async (featureDescription) => {
 
 **Feature Description:** ${featureDescription}
 
-Generate 5-8 diverse test cases covering:
+Generate 5-8 diverse test cases in the exact SAME LANGUAGE as the Feature Description (e.g., if the description is in Vietnamese, generate Vietnamese test cases), covering:
 1. **Happy Path** - Normal successful flows
 2. **Edge Cases** - Boundary values, limits, extremes
 3. **Error Handling** - Invalid inputs, error states
@@ -70,7 +70,7 @@ Make test cases:
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a senior QA engineer who generates comprehensive, professional test cases. Always respond with ONLY valid JSON, no markdown formatting or explanations.',
+                    content: 'You are a senior QA engineer who generates comprehensive, professional test cases. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (title, description, steps, expectedResult, actions) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
                 },
                 {
                     role: 'user',
@@ -83,7 +83,7 @@ Make test cases:
 
         const content = response.choices[0].message.content;
         const testCases = extractJSON(content);
-        
+
         // Validate response structure
         if (!Array.isArray(testCases)) {
             throw new Error('Invalid response format: expected an array of test cases');
@@ -92,14 +92,14 @@ Make test cases:
         return testCases;
     } catch (error) {
         console.error('OpenAI API Error:', error.message);
-        
+
         // Provide more specific error messages
         if (error.code === 'insufficient_quota') {
             throw new Error('OpenAI API quota exceeded. Please check your billing.');
         } else if (error.code === 'invalid_api_key') {
             throw new Error('Invalid OpenAI API key. Please check your configuration.');
         }
-        
+
         throw new Error('Failed to generate test case suggestions: ' + error.message);
     }
 };
@@ -112,7 +112,7 @@ export const generateTestPlanSuggestions = async (projectDescription) => {
 
 **Project Description:** ${projectDescription}
 
-Generate a complete test plan structure with 4-6 major test scenarios/modules. Return ONLY a JSON object in this exact format:
+Generate a complete test plan structure in the exact SAME LANGUAGE as the Project Description (e.g., if the description is in Vietnamese, generate in Vietnamese) with 4-6 major test scenarios/modules. Return ONLY a JSON object in this exact format:
 
 {
   "name": "Descriptive test plan name",
@@ -153,7 +153,7 @@ The test plan should be:
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a senior QA lead who creates comprehensive test plans. Always respond with ONLY valid JSON, no markdown formatting or explanations.',
+                    content: 'You are a senior QA lead who creates comprehensive test plans. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (test scenarios, cases, descriptions, actions, expected results) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
                 },
                 {
                     role: 'user',
@@ -170,13 +170,13 @@ The test plan should be:
         return testPlan;
     } catch (error) {
         console.error('OpenAI API Error:', error.message);
-        
+
         if (error.code === 'insufficient_quota') {
             throw new Error('OpenAI API quota exceeded. Please check your billing.');
         } else if (error.code === 'invalid_api_key') {
             throw new Error('Invalid OpenAI API key. Please check your configuration.');
         }
-        
+
         throw new Error('Failed to generate test plan suggestions: ' + error.message);
     }
 };
@@ -194,7 +194,7 @@ Steps: ${JSON.stringify(testCase.steps || [])}
 Priority: ${testCase.priority}
 Category: ${testCase.category}
 
-Provide an improved version that:
+Provide an improved version in the exact SAME LANGUAGE as the Current Test Case that:
 - Has clearer, more specific title and description
 - Includes more detailed steps with specific test data
 - Has better expected results
@@ -222,7 +222,7 @@ Return ONLY a JSON object in this format:
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a senior QA engineer who reviews and improves test cases. Always respond with ONLY valid JSON.',
+                    content: 'You are a senior QA engineer who reviews and improves test cases. Always respond with ONLY valid JSON. IMPORTANT: You MUST generate content in the SAME LANGUAGE as the input test case.',
                 },
                 {
                     role: 'user',

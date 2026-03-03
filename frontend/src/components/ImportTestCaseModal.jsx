@@ -118,7 +118,7 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
             onClick={onClose}
         >
             <div
-                className="glass rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                className="modal max-w-2xl w-full max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="p-6">
@@ -130,9 +130,9 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-gray-500 hover:text-gray-700 text-2xl"
+                            className="btn btn-ghost btn-icon"
                         >
-                            ×
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                         </button>
                     </div>
 
@@ -145,14 +145,14 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => handleDownloadTemplate('xlsx')}
-                                className="btn-secondary flex items-center gap-2"
+                                className="btn btn-secondary"
                             >
                                 <i className="fi fi-tr-file-spreadsheet"></i>
                                 Download XLSX Template
                             </button>
                             <button
                                 onClick={() => handleDownloadTemplate('csv')}
-                                className="btn-secondary flex items-center gap-2"
+                                className="btn btn-secondary"
                             >
                                 <i className="fi fi-tr-file-spreadsheet"></i>
                                 Download CSV Template
@@ -236,7 +236,7 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
                     <div className="flex justify-end gap-3">
                         <button
                             onClick={onClose}
-                            className="btn-secondary"
+                            className="btn btn-secondary"
                             disabled={uploading}
                         >
                             {result?.success ? 'Close' : 'Cancel'}
@@ -244,7 +244,7 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
                         {!result?.success && (
                             <button
                                 onClick={handleImport}
-                                className="btn-primary"
+                                className="btn btn-primary"
                                 disabled={!file || uploading}
                             >
                                 {uploading ? (

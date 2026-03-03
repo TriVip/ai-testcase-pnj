@@ -4,14 +4,15 @@ import { useToast, ToastContainer } from './Toast';
 
 const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
     const [featureDescription, setFeatureDescription] = useState('');
+    const [file, setFile] = useState(null);
     const [suggestions, setSuggestions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedSuggestions, setSelectedSuggestions] = useState(new Set());
     const toast = useToast();
 
     const handleGenerate = async () => {
-        if (!featureDescription.trim()) {
-            toast.warning('Please enter a feature description');
+        if (!featureDescription.trim() && !file) {
+            toast.warning('Please enter a feature description or attach a document');
             return;
         }
 
@@ -21,7 +22,7 @@ const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
 
         try {
             toast.info('Generating test cases with AI...', 2000);
-            const response = await aiAPI.suggestTestCases(featureDescription);
+            const response = await aiAPI.suggestTestCases(featureDescription, file);
             setSuggestions(response.data.suggestions);
             toast.success(`Generated ${response.data.suggestions.length} test case suggestions!`);
         } catch (error) {
@@ -127,6 +128,19 @@ const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
                                 disabled={loading}
                             />
                             <div style={{ marginTop: 'var(--space-3)' }}>
+                                <label className="btn btn-outline btn-sm" style={{ marginRight: 'var(--space-3)', cursor: 'pointer' }}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+                                    Attach File
+                                    <input
+                                        type="file"
+                                        accept=".txt,.pdf,.docx"
+                                        onChange={(e) => setFile(e.target.files[0])}
+                                        style={{ display: 'none' }}
+                                        disabled={loading}
+                                    />
+                                </label>
+                                {file && <span style={{ fontSize: 'var(--text-xs)', marginRight: 'var(--space-3)' }}>{file.name}</span>}
+
                                 <button
                                     onClick={handleGenerate}
                                     className="btn btn-primary btn-sm"

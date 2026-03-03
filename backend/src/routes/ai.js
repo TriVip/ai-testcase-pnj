@@ -1,10 +1,29 @@
 import express from 'express';
-import { 
-    generateTestCaseSuggestions, 
+import {
+    generateTestCaseSuggestions,
     generateTestPlanSuggestions,
-    improveTestCase 
+    improveTestCase
 } from '../services/openai.js';
 import { isAuthenticated } from '../middleware/auth.js';
+import multer from 'multer';
+import { extractTextFromFile } from '../utils/fileParser.js';
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            'text/plain',
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only TXT, PDF, and DOCX files are allowed.'));
+        }
+    }
+});
 
 const router = express.Router();
 
@@ -13,12 +32,21 @@ router.use(isAuthenticated);
 
 // @route   POST /api/ai/suggest-testcases
 // @desc    Generate AI test case suggestions
-router.post('/suggest-testcases', async (req, res) => {
+router.post('/suggest-testcases', upload.single('file'), async (req, res) => {
     try {
-        const { featureDescription } = req.body;
+        let { featureDescription } = req.body;
 
-        if (!featureDescription) {
-            return res.status(400).json({ message: 'Feature description is required' });
+        // Handle optional file upload
+        if (req.file) {
+            const fileText = await extractTextFromFile(req.file);
+            // Append file text to the description provided by the user
+            featureDescription = featureDescription
+                ? `${featureDescription}\n\n--- Content from ${req.file.originalname} ---\n${fileText}`
+                : `--- Content from ${req.file.originalname} ---\n${fileText}`;
+        }
+
+        if (!featureDescription || !featureDescription.trim()) {
+            return res.status(400).json({ message: 'Feature description or a document file is required' });
         }
 
         const suggestions = await generateTestCaseSuggestions(featureDescription);
