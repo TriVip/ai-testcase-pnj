@@ -16,7 +16,7 @@ services:
     environment:
       - PORT=${PORT:-9999}
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/testcase-gen}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8080}
+      - FRONTEND_URL=${FRONTEND_URL:-https://rekcal.kinavity.com}
       - NODE_ENV=${NODE_ENV:-development}
     env_file:
       - .env
