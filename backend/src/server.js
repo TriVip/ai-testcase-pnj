@@ -39,6 +39,9 @@ console.log('🔑 OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Found (' + pro
 // Initialize Express app
 const app = express();
 
+// Trust first proxy (Nginx) - required for correct cookie/IP handling behind reverse proxy
+app.set('trust proxy', 1);
+
 // Connect to MongoDB
 connectDB();
 
