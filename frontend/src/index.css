@@ -1142,3 +1142,267 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* ========================
+   MOBILE HAMBURGER BUTTON
+   ======================== */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 60;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+  line-height: 0;
+  transition: background-color var(--transition);
+}
+
+.mobile-menu-toggle:hover {
+  background-color: var(--bg-surface-2);
+}
+
+/* Sidebar overlay (mobile) */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+}
+
+.sidebar-overlay.active {
+  display: block;
+}
+
+/* Layout helper classes for responsive grids */
+.dashboard-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.testplans-layout {
+  display: flex;
+  gap: var(--space-5);
+  height: calc(100vh - 160px);
+}
+
+.testplans-tree-panel {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.testplans-detail-panel {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* ========================
+   RESPONSIVE — TABLET & MOBILE
+   ======================== */
+@media (max-width: 768px) {
+
+  /* Show hamburger */
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  /* Sidebar: hidden by default, slide-in when open */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 55;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  /* Page content: full width */
+  .page-content {
+    margin-left: 0 !important;
+  }
+
+  /* Page inner: less padding */
+  .page-inner {
+    padding: var(--space-4);
+    padding-top: calc(var(--space-4) + 44px);
+    /* room for hamburger */
+  }
+
+  /* Page header: stack vertically */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .page-header-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .page-header-actions .btn {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  /* Filter bar: wrap */
+  .filter-bar {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .filter-bar .filter-search {
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .filter-bar .filter-select {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  /* Data tables: horizontal scroll */
+  .data-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table {
+    min-width: 600px;
+  }
+
+  /* Modals: full width */
+  .modal-backdrop {
+    padding: var(--space-2);
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: 100% !important;
+    max-height: 92vh;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+
+  .modal-header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .modal-body {
+    padding: var(--space-4);
+  }
+
+  .modal-footer {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* Dashboard two-column → single column */
+  .dashboard-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Test Plans — stack vertically */
+  .testplans-layout {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .testplans-tree-panel {
+    width: 100%;
+    max-height: 300px;
+  }
+
+  .testplans-detail-panel {
+    min-height: 400px;
+  }
+
+  /* Bulk action bar */
+  .bulk-action-bar {
+    flex-wrap: wrap;
+  }
+
+  /* Toast container */
+  .toast-container {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+  }
+
+  .toast {
+    max-width: 100%;
+  }
+
+  /* KPI tiles — 2 columns */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Expanded row detail: single column */
+  .data-table .row-detail td>div {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Panel header: wrap actions */
+  .panel-header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* Test Plan detail header: stack */
+  .panel-header>div:last-child {
+    flex-wrap: wrap;
+  }
+}
+
+/* ========================
+   RESPONSIVE — SMALL PHONE
+   ======================== */
+@media (max-width: 480px) {
+  .page-inner {
+    padding: var(--space-3);
+    padding-top: calc(var(--space-3) + 44px);
+  }
+
+  .page-title {
+    font-size: var(--text-lg);
+  }
+
+  /* KPI tiles — 1 column */
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .kpi-tile {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .page-header-actions .btn {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  /* Filter selects: full width */
+  .filter-bar .filter-select {
+    flex: 1 1 100%;
+  }
+
+  /* Pagination compact */
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

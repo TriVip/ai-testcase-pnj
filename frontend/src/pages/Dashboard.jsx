@@ -74,7 +74,7 @@ const Dashboard = () => {
                 ) : (
                     <>
                         {/* KPI Strip */}
-                        <div style={{
+                        <div className="kpi-grid" style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
                             gap: 'var(--space-4)',
@@ -114,7 +114,7 @@ const Dashboard = () => {
                         </div>
 
                         {/* Two-column content area */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 'var(--space-6)', alignItems: 'start' }}>
+                        <div className="dashboard-content-grid">
                             {/* Recent Test Cases */}
                             <div className="panel">
                                 <div className="panel-header">

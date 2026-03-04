@@ -64,6 +64,16 @@ const TestPlanForm = ({ testPlan, onClose }) => {
         });
     };
 
+    const allSelected = availableTestCases.length > 0 && availableTestCases.every(tc => formData.testCases.includes(tc._id));
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setFormData({ ...formData, testCases: [] });
+        } else {
+            setFormData({ ...formData, testCases: availableTestCases.map(tc => tc._id) });
+        }
+    };
+
     return (
         <div
             className="modal-backdrop"
@@ -152,9 +162,21 @@ const TestPlanForm = ({ testPlan, onClose }) => {
 
                         {/* Test Cases Selection */}
                         <div className="form-group">
-                            <label className="form-label">
-                                Test Cases ({formData.testCases.length} selected)
-                            </label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                                <label className="form-label" style={{ margin: 0 }}>
+                                    Test Cases ({formData.testCases.length} selected)
+                                </label>
+                                {availableTestCases.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={toggleSelectAll}
+                                        className="btn btn-ghost btn-sm"
+                                        style={{ fontSize: 'var(--text-xs)', padding: '4px 10px' }}
+                                    >
+                                        {allSelected ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                )}
+                            </div>
                             {availableTestCases.length === 0 ? (
                                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No test cases available. Create some test cases first.</p>
                             ) : (

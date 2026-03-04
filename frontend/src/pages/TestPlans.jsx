@@ -158,15 +158,10 @@ const TestPlans = () => {
                         <button onClick={() => setShowForm(true)} className="btn btn-primary">Create Test Plan</button>
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', gap: 'var(--space-5)', height: 'calc(100vh - 160px)' }}>
+                    <div className="testplans-layout">
 
                         {/* LEFT PANEL — Plan Tree */}
-                        <div style={{
-                            width: 280, flexShrink: 0, overflowY: 'auto',
-                            background: 'var(--bg-surface)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius-md)',
-                        }}>
+                        <div className="testplans-tree-panel">
                             {/* Panel header */}
                             <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Plans</span>
@@ -278,7 +273,7 @@ const TestPlans = () => {
                         </div>
 
                         {/* RIGHT PANEL — Detail */}
-                        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+                        <div className="testplans-detail-panel">
                             {selectedTC ? (
                                 /* Test Case detail */
                                 <div className="panel">

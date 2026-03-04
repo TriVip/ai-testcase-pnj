@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 // SVG icons — inline for zero dependency
@@ -43,6 +43,14 @@ const IconSun = () => (
     </svg>
 );
 
+const IconMenu = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+);
+
 const NAV_ITEMS = [
     { to: '/dashboard', label: 'Dashboard', icon: <IconDashboard /> },
     { to: '/testcases', label: 'Test Cases', icon: <IconTestCases /> },
@@ -52,6 +60,13 @@ const NAV_ITEMS = [
 const Sidebar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [mobileOpen, setMobileOpen] = useState(false);
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        setMobileOpen(false);
+    }, [location.pathname]);
 
     // Keyboard shortcuts: Cmd/Ctrl + 1/2/3
     useEffect(() => {
@@ -65,6 +80,16 @@ const Sidebar = () => {
         return () => window.removeEventListener('keydown', handleKey);
     }, [navigate]);
 
+    // Prevent body scroll when sidebar is open on mobile
+    useEffect(() => {
+        if (mobileOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [mobileOpen]);
+
     // Dark mode toggle
     const toggleDark = () => {
         document.documentElement.classList.toggle('dark');
@@ -72,88 +97,105 @@ const Sidebar = () => {
     const isDark = document.documentElement.classList.contains('dark');
 
     return (
-        <aside className="sidebar">
-            {/* Logo */}
-            <div className="sidebar-logo">
-                <img src="/logo.png" alt="Logo" style={{ width: 52, height: 52, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.4))' }} />
-                <span className="sidebar-logo-text">QA Manager</span>
-            </div>
+        <>
+            {/* Mobile hamburger button */}
+            <button
+                className="mobile-menu-toggle"
+                onClick={() => setMobileOpen(true)}
+                aria-label="Open menu"
+            >
+                <IconMenu />
+            </button>
 
-            {/* Navigation */}
-            <nav className="sidebar-nav">
-                <span className="sidebar-section-label">Navigation</span>
-                {NAV_ITEMS.map(item => (
-                    <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={({ isActive }) =>
-                            `sidebar-item${isActive ? ' active' : ''}`
-                        }
+            {/* Mobile overlay */}
+            <div
+                className={`sidebar-overlay${mobileOpen ? ' active' : ''}`}
+                onClick={() => setMobileOpen(false)}
+            />
+
+            <aside className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
+                {/* Logo */}
+                <div className="sidebar-logo">
+                    <img src="/logo.png" alt="Logo" style={{ width: 52, height: 52, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.4))' }} />
+                    <span className="sidebar-logo-text">QA Manager</span>
+                </div>
+
+                {/* Navigation */}
+                <nav className="sidebar-nav">
+                    <span className="sidebar-section-label">Navigation</span>
+                    {NAV_ITEMS.map(item => (
+                        <NavLink
+                            key={item.to}
+                            to={item.to}
+                            className={({ isActive }) =>
+                                `sidebar-item${isActive ? ' active' : ''}`
+                            }
+                        >
+                            <span className="sidebar-item-icon">{item.icon}</span>
+                            <span>{item.label}</span>
+                        </NavLink>
+                    ))}
+                </nav>
+
+                {/* Footer */}
+                <div className="sidebar-footer">
+                    {/* Dark mode toggle */}
+                    <button
+                        onClick={toggleDark}
+                        className="sidebar-item"
+                        style={{ width: '100%', border: 'none', cursor: 'pointer', background: 'none' }}
+                        title="Toggle dark mode"
                     >
-                        <span className="sidebar-item-icon">{item.icon}</span>
-                        <span>{item.label}</span>
-                    </NavLink>
-                ))}
-            </nav>
+                        <span className="sidebar-item-icon">{isDark ? <IconSun /> : <IconMoon />}</span>
+                        <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+                    </button>
 
-            {/* Footer */}
-            <div className="sidebar-footer">
-                {/* Dark mode toggle */}
-                <button
-                    onClick={toggleDark}
-                    className="sidebar-item"
-                    style={{ width: '100%', border: 'none', cursor: 'pointer', background: 'none' }}
-                    title="Toggle dark mode"
-                >
-                    <span className="sidebar-item-icon">{isDark ? <IconSun /> : <IconMoon />}</span>
-                    <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
-                </button>
-
-                {/* User */}
-                {user && (
-                    <div style={{ marginTop: 4 }}>
-                        <div className="sidebar-user">
-                            {user.picture ? (
-                                <img
-                                    src={user.picture}
-                                    alt={user.name}
-                                    style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }}
-                                />
-                            ) : (
-                                <div style={{
-                                    width: 28, height: 28, borderRadius: '50%',
-                                    background: 'var(--brand)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
-                                }}>
-                                    {user.name?.[0]?.toUpperCase()}
+                    {/* User */}
+                    {user && (
+                        <div style={{ marginTop: 4 }}>
+                            <div className="sidebar-user">
+                                {user.picture ? (
+                                    <img
+                                        src={user.picture}
+                                        alt={user.name}
+                                        style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }}
+                                    />
+                                ) : (
+                                    <div style={{
+                                        width: 28, height: 28, borderRadius: '50%',
+                                        background: 'var(--brand)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+                                    }}>
+                                        {user.name?.[0]?.toUpperCase()}
+                                    </div>
+                                )}
+                                <div className="sidebar-user-info">
+                                    <div className="sidebar-user-name">{user.name}</div>
+                                    <div className="sidebar-user-email">{user.email}</div>
                                 </div>
-                            )}
-                            <div className="sidebar-user-info">
-                                <div className="sidebar-user-name">{user.name}</div>
-                                <div className="sidebar-user-email">{user.email}</div>
+                                <button
+                                    onClick={logout}
+                                    title="Logout"
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer',
+                                        color: 'var(--text-on-sidebar)', padding: 4,
+                                        display: 'flex', alignItems: 'center',
+                                        borderRadius: 'var(--radius)',
+                                        opacity: 0.6,
+                                        transition: 'opacity var(--transition)',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                                    onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
+                                >
+                                    <IconLogout />
+                                </button>
                             </div>
-                            <button
-                                onClick={logout}
-                                title="Logout"
-                                style={{
-                                    background: 'none', border: 'none', cursor: 'pointer',
-                                    color: 'var(--text-on-sidebar)', padding: 4,
-                                    display: 'flex', alignItems: 'center',
-                                    borderRadius: 'var(--radius)',
-                                    opacity: 0.6,
-                                    transition: 'opacity var(--transition)',
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                                onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
-                            >
-                                <IconLogout />
-                            </button>
                         </div>
-                    </div>
-                )}
-            </div>
-        </aside>
+                    )}
+                </div>
+            </aside>
+        </>
     );
 };
 
