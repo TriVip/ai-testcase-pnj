@@ -29,11 +29,12 @@ router.post('/register', async (req, res) => {
             expiresIn: '7d',
         });
 
-        // Set cookie (secure: false to work behind Nginx reverse proxy)
+        // Set cookie (secure: true and sameSite: 'none' for production SSL cross-origin support)
         res.cookie('token', token, {
             httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
+            secure: true,
+            sameSite: 'none',
+            path: '/',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -75,11 +76,12 @@ router.post('/login', async (req, res) => {
             expiresIn: '7d',
         });
 
-        // Set cookie (secure: false to work behind Nginx reverse proxy)
+        // Set cookie (secure: true and sameSite: 'none' for production SSL cross-origin support)
         res.cookie('token', token, {
             httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
+            secure: true,
+            sameSite: 'none',
+            path: '/',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -125,7 +127,7 @@ router.get('/current', async (req, res) => {
 // @route   POST /api/auth/logout
 // @desc    Logout user
 router.post('/logout', (req, res) => {
-    res.clearCookie('token', { httpOnly: true, secure: false, sameSite: 'lax' });
+    res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'none', path: '/' });
     res.json({ message: 'Logged out successfully' });
 });
 
