@@ -781,6 +781,15 @@
     overflow: hidden;
   }
 
+  /* Forms inside modals must inherit flex layout so modal-body can scroll */
+  .modal>form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .modal-header {
     display: flex;
     align-items: center;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { testCasesAPI } from '../services/api';
 
 const TestCaseForm = ({ testCase, onClose }) => {
@@ -14,6 +14,7 @@ const TestCaseForm = ({ testCase, onClose }) => {
     });
     const [loading, setLoading] = useState(false);
     const [tagInput, setTagInput] = useState('');
+    const modalBodyRef = useRef(null);
 
     useEffect(() => {
         if (testCase) {
@@ -54,6 +55,10 @@ const TestCaseForm = ({ testCase, onClose }) => {
             ...formData,
             steps: [...formData.steps, { stepNumber: formData.steps.length + 1, action: '', expectedResult: '' }],
         });
+        // Auto-scroll to the new step after render
+        setTimeout(() => {
+            modalBodyRef.current?.scrollTo({ top: modalBodyRef.current.scrollHeight, behavior: 'smooth' });
+        }, 50);
     };
 
     const removeStep = (index) => {
@@ -102,7 +107,7 @@ const TestCaseForm = ({ testCase, onClose }) => {
                         </button>
                     </div>
 
-                    <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                    <div className="modal-body" ref={modalBodyRef} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                         {/* Title */}
                         <div className="form-group">
                             <label className="form-label">Title *</label>
