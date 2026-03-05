@@ -1,9 +1,14 @@
 import express from 'express';
 import multer from 'multer';
 import TestCase from '../models/TestCase.js';
+import TestPlan from '../models/TestPlan.js';
 import { isAuthenticated } from '../middleware/auth.js';
+import { createRateLimiter } from '../middleware/rateLimit.js';
 import { parseXLSX, parseCSV, validateImportData } from '../utils/importUtils.js';
 import { generateXLSXTemplate, generateCSVTemplate } from '../utils/templateGenerator.js';
+
+// Rate limiter: max 10 delete operations per 10 seconds per user
+const deleteLimiter = createRateLimiter({ windowMs: 10_000, max: 10, message: 'Too many delete requests. Please slow down.' });
 
 const router = express.Router();
 
@@ -118,6 +123,50 @@ router.post('/import', upload.single('file'), async (req, res) => {
     }
 });
 
+// @route   POST /api/testcases/batch-delete
+// @desc    Delete multiple test cases in a single request (max 50)
+router.post('/batch-delete', deleteLimiter, async (req, res) => {
+    try {
+        const { ids } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'ids must be a non-empty array' });
+        }
+
+        if (ids.length > 50) {
+            return res.status(400).json({ message: 'Maximum 50 items per batch delete' });
+        }
+
+        // Delete all test cases that belong to this user
+        const result = await TestCase.deleteMany({
+            _id: { $in: ids },
+            user: req.userId,
+        });
+
+        // Clean up references in test plans and auto-obsolete empty plans
+        const affectedPlans = await TestPlan.find({
+            user: req.userId,
+            testCases: { $in: ids },
+        });
+
+        for (const plan of affectedPlans) {
+            plan.testCases = plan.testCases.filter(tcId => !ids.includes(tcId.toString()));
+            if (plan.testCases.length === 0 && plan.status !== 'Obsolete') {
+                plan.status = 'Obsolete';
+            }
+            await plan.save();
+        }
+
+        res.json({
+            message: `${result.deletedCount} test case(s) deleted`,
+            deletedCount: result.deletedCount,
+            obsoletedPlans: affectedPlans.filter(p => p.status === 'Obsolete').map(p => p._id),
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
 // @route   GET /api/testcases/:id
 // @desc    Get single test case
 router.get('/:id', async (req, res) => {
@@ -171,7 +220,7 @@ router.put('/:id', async (req, res) => {
 
 // @route   DELETE /api/testcases/:id
 // @desc    Delete test case
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', deleteLimiter, async (req, res) => {
     try {
         const testCase = await TestCase.findOneAndDelete({ _id: req.params.id, user: req.userId });
 
@@ -179,7 +228,24 @@ router.delete('/:id', async (req, res) => {
             return res.status(404).json({ message: 'Test case not found' });
         }
 
-        res.json({ message: 'Test case deleted successfully' });
+        // Clean up references in test plans and auto-obsolete empty plans
+        const affectedPlans = await TestPlan.find({
+            user: req.userId,
+            testCases: req.params.id,
+        });
+
+        for (const plan of affectedPlans) {
+            plan.testCases = plan.testCases.filter(tcId => tcId.toString() !== req.params.id);
+            if (plan.testCases.length === 0 && plan.status !== 'Obsolete') {
+                plan.status = 'Obsolete';
+            }
+            await plan.save();
+        }
+
+        res.json({
+            message: 'Test case deleted successfully',
+            obsoletedPlans: affectedPlans.filter(p => p.status === 'Obsolete').map(p => p._id),
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }

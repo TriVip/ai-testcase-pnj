@@ -42,6 +42,7 @@ const TestCases = () => {
     const [expandedRow, setExpandedRow] = useState(null);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [improvingId, setImprovingId] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -87,23 +88,42 @@ const TestCases = () => {
 
     const handleDelete = async (id) => {
         if (!confirm('Delete this test case?')) return;
+        setDeleting(true);
         try {
             await testCasesAPI.delete(id);
             setTestCases(prev => prev.filter(tc => tc._id !== id));
             setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; });
             if (expandedRow === id) setExpandedRow(null);
             toast.success('Test case deleted');
-        } catch { toast.error('Failed to delete'); }
+        } catch (err) {
+            if (err.response?.status === 429) {
+                toast.error('Too many delete requests. Please slow down.');
+            } else {
+                toast.error('Failed to delete');
+            }
+        } finally {
+            setDeleting(false);
+        }
     };
 
     const handleBulkDelete = async () => {
         if (!confirm(`Delete ${selectedIds.size} test case(s)?`)) return;
+        setDeleting(true);
         try {
-            await Promise.all([...selectedIds].map(id => testCasesAPI.delete(id)));
+            const ids = [...selectedIds];
+            const res = await testCasesAPI.batchDelete(ids);
             setTestCases(prev => prev.filter(tc => !selectedIds.has(tc._id)));
+            toast.success(`${res.data.deletedCount} test cases deleted`);
             setSelectedIds(new Set());
-            toast.success(`${selectedIds.size} test cases deleted`);
-        } catch { toast.error('Failed to delete some items'); }
+        } catch (err) {
+            if (err.response?.status === 429) {
+                toast.error('Too many delete requests. Please slow down.');
+            } else {
+                toast.error('Failed to delete some items');
+            }
+        } finally {
+            setDeleting(false);
+        }
     };
 
     const handleImprove = async (tc) => {
@@ -301,9 +321,10 @@ const TestCases = () => {
                             <span className="bulk-count">{selectedIds.size} selected</span>
                             <button
                                 onClick={handleBulkDelete}
-                                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '3px 10px', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
+                                disabled={deleting}
+                                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '3px 10px', borderRadius: 'var(--radius)', cursor: deleting ? 'not-allowed' : 'pointer', fontSize: 'var(--text-sm)', opacity: deleting ? 0.6 : 1 }}
                             >
-                                Delete selected
+                                {deleting ? 'Deleting…' : 'Delete selected'}
                             </button>
                             <button
                                 onClick={() => exportTestCasesToXLSX(testCases.filter(tc => selectedIds.has(tc._id)))}
@@ -441,7 +462,8 @@ const TestCases = () => {
                                                                 onClick={() => handleDelete(tc._id)}
                                                                 className="btn btn-ghost btn-icon"
                                                                 title="Delete"
-                                                                style={{ color: 'var(--status-fail)' }}
+                                                                disabled={deleting}
+                                                                style={{ color: 'var(--status-fail)', opacity: deleting ? 0.4 : 1 }}
                                                             >
                                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
                                                             </button>

@@ -1,6 +1,10 @@
 import express from 'express';
 import TestPlan from '../models/TestPlan.js';
 import { isAuthenticated } from '../middleware/auth.js';
+import { createRateLimiter } from '../middleware/rateLimit.js';
+
+// Rate limiter: max 10 delete operations per 10 seconds per user
+const deleteLimiter = createRateLimiter({ windowMs: 10_000, max: 10 });
 
 const router = express.Router();
 
@@ -75,7 +79,7 @@ router.put('/:id', async (req, res) => {
 
 // @route   DELETE /api/testplans/:id
 // @desc    Delete test plan
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', deleteLimiter, async (req, res) => {
     try {
         const testPlan = await TestPlan.findOneAndDelete({ _id: req.params.id, user: req.userId });
 
@@ -125,6 +129,12 @@ router.delete('/:id/testcases/:testCaseId', async (req, res) => {
         testPlan.testCases = testPlan.testCases.filter(
             (tc) => tc.toString() !== req.params.testCaseId
         );
+
+        // Auto-obsolete if no test cases remain
+        if (testPlan.testCases.length === 0 && testPlan.status !== 'Obsolete') {
+            testPlan.status = 'Obsolete';
+        }
+
         await testPlan.save();
         await testPlan.populate('testCases');
 

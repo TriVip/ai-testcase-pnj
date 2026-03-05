@@ -18,6 +18,7 @@ export const testCasesAPI = {
     create: (data) => api.post('/testcases', data),
     update: (id, data) => api.put(`/testcases/${id}`, data),
     delete: (id) => api.delete(`/testcases/${id}`),
+    batchDelete: (ids) => api.post('/testcases/batch-delete', { ids }),
     importTestCases: (file) => {
         const formData = new FormData();
         formData.append('file', file);

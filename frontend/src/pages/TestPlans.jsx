@@ -51,6 +51,7 @@ const TestPlans = () => {
     const [editingExec, setEditingExec] = useState(null);
     const [execStatus, setExecStatus] = useState('Pending');
     const [execNotes, setExecNotes] = useState('');
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => { fetchTestPlans(); }, []);
 
@@ -64,11 +65,13 @@ const TestPlans = () => {
 
     const handleDelete = async (id) => {
         if (!confirm('Delete this test plan?')) return;
+        setDeleting(true);
         try {
             await testPlansAPI.delete(id);
             setTestPlans(prev => prev.filter(p => p._id !== id));
             if (selectedPlan?._id === id) { setSelectedPlan(null); setSelectedTC(null); }
         } catch { alert('Failed to delete test plan'); }
+        finally { setDeleting(false); }
     };
 
     const handleEdit = (plan) => { setEditingTestPlan(plan); setShowForm(true); };
@@ -361,8 +364,10 @@ const TestPlans = () => {
                                             <button
                                                 onClick={() => { handleDelete(selectedPlan._id); }}
                                                 className="btn btn-danger btn-sm"
+                                                disabled={deleting}
+                                                style={{ opacity: deleting ? 0.6 : 1 }}
                                             >
-                                                Delete
+                                                {deleting ? 'Deleting…' : 'Delete'}
                                             </button>
                                         </div>
                                     </div>

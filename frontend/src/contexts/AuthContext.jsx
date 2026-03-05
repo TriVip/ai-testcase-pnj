@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -30,8 +31,18 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const login = () => {
-        window.location.href = '/api/auth/google';
+    // Login with credentials, saves user directly from response (no extra /current call)
+    const loginWithCredentials = async (username, password) => {
+        const response = await api.post('/auth/login', { username, password }, { withCredentials: true });
+        setUser(response.data.user);
+        return response.data;
+    };
+
+    // Register, saves user directly from response (no extra /current call)
+    const registerUser = async (formData) => {
+        const response = await api.post('/auth/register', formData, { withCredentials: true });
+        setUser(response.data.user);
+        return response.data;
     };
 
     const logout = async () => {
@@ -47,7 +58,8 @@ export const AuthProvider = ({ children }) => {
     const value = {
         user,
         loading,
-        login,
+        loginWithCredentials,
+        registerUser,
         logout,
         isAuthenticated: !!user,
     };

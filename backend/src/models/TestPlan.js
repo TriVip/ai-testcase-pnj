@@ -19,7 +19,7 @@ const testPlanSchema = new mongoose.Schema(
         ],
         status: {
             type: String,
-            enum: ['Planning', 'In Progress', 'Completed', 'On Hold'],
+            enum: ['Planning', 'In Progress', 'Completed', 'On Hold', 'Obsolete'],
             default: 'Planning',
         },
         startDate: {

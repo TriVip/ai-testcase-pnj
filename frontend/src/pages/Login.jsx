@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import api from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
+    const { loginWithCredentials, registerUser } = useAuth();
+    const navigate = useNavigate();
     const [isRegister, setIsRegister] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -18,17 +21,14 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const endpoint = isRegister ? '/auth/register' : '/auth/login';
-            const payload = isRegister
-                ? formData
-                : { username: formData.username, password: formData.password };
+            if (isRegister) {
+                await registerUser(formData);
+            } else {
+                await loginWithCredentials(formData.username, formData.password);
+            }
 
-            await api.post(endpoint, payload, {
-                withCredentials: true,
-            });
-
-            // Redirect to dashboard on success
-            window.location.href = '/dashboard';
+            // Navigate via React Router (no full page reload, no extra /current call)
+            navigate('/dashboard');
         } catch (err) {
             setError(err.response?.data?.message || 'Authentication failed');
         } finally {

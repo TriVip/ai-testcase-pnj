@@ -23,6 +23,7 @@ const STATUS_MAP = {
     'In Progress': 'status-tag plan-inprogress',
     Completed: 'status-tag plan-completed',
     'On Hold': 'status-tag plan-onhold',
+    Obsolete: 'status-tag status-blocked',
 };
 
 const StatusTag = ({ status, className = '' }) => {
