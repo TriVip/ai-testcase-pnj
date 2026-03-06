@@ -11,7 +11,7 @@ import authRoutes from './routes/auth.js';
 import testCaseRoutes from './routes/testCases.js';
 import testPlanRoutes from './routes/testPlans.js';
 import aiRoutes from './routes/ai.js';
-import jiraRoutes from './routes/jira.js';
+// import jiraRoutes from './routes/jira.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -60,7 +60,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/testcases', testCaseRoutes);
 app.use('/api/testplans', testPlanRoutes);
 app.use('/api/ai', aiRoutes);
-app.use('/api/jira', jiraRoutes);
+// app.use('/api/jira', jiraRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
