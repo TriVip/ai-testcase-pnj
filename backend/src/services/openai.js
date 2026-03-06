@@ -26,20 +26,17 @@ const extractJSON = (content) => {
 };
 
 // Generate Test Case Suggestions
-export const generateTestCaseSuggestions = async (featureDescription) => {
+export const generateTestCaseSuggestions = async (featureDescription, count = null) => {
     try {
         const openai = getOpenAIClient();
+        const countInstruction = count
+            ? `Generate EXACTLY ${count} test case(s) — no more, no less.`
+            : `Generate 5–8 diverse test cases.`;
         const prompt = `You are a senior QA engineer with expertise in test case design. Generate comprehensive test cases for the following feature:
 
 **Feature Description:** ${featureDescription}
 
-Generate the number of test cases requested by the user in the Feature Description. If no specific number is mentioned, generate 5-8 diverse test cases. All test cases MUST be in the exact SAME LANGUAGE as the Feature Description (e.g., if the description is in Vietnamese, generate Vietnamese test cases). Ensure coverage across the following areas where applicable:
-1. **Happy Path** - Normal successful flows
-2. **Edge Cases** - Boundary values, limits, extremes
-3. **Error Handling** - Invalid inputs, error states
-4. **Security** - Authentication, authorization, data validation
-5. **Performance** - Load, stress scenarios if applicable
-6. **Usability** - User experience considerations
+${countInstruction} All test cases MUST be in the exact SAME LANGUAGE as the Feature Description (e.g., if the description is in Vietnamese, generate Vietnamese test cases). Ensure coverage across appropriate areas such as happy paths, edge cases, error handling, security, and usability.
 
 Return ONLY a JSON array in this exact format:
 [
@@ -69,8 +66,7 @@ Make test cases:
             model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
             messages: [
                 {
-                    role: 'system',
-                    content: 'You are a senior QA engineer who generates comprehensive, professional test cases. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (title, description, steps, expectedResult, actions) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
+                    content: 'You are a senior QA engineer who generates comprehensive, professional test cases focused exclusively on the e-commerce website PNJ (Phú Nhuận Jewelry). Always consider PNJ\'s specific business context (jewelry, luxury goods, promotions, online shopping, store pickup) when generating test cases. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (title, description, steps, expectedResult, actions) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
                 },
                 {
                     role: 'user',
@@ -152,8 +148,7 @@ The test plan should be:
             model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
             messages: [
                 {
-                    role: 'system',
-                    content: 'You are a senior QA lead who creates comprehensive test plans. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (test scenarios, cases, descriptions, actions, expected results) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
+                    content: 'You are a senior QA lead who creates comprehensive test plans focused exclusively on the e-commerce website PNJ (Phú Nhuận Jewelry). Always consider PNJ\'s specific business context (jewelry, luxury goods, promotions, online shopping, store pickup) when creating test plans. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (test scenarios, cases, descriptions, actions, expected results) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
                 },
                 {
                     role: 'user',
@@ -221,8 +216,7 @@ Return ONLY a JSON object in this format:
             model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
             messages: [
                 {
-                    role: 'system',
-                    content: 'You are a senior QA engineer who reviews and improves test cases. Always respond with ONLY valid JSON. IMPORTANT: You MUST generate content in the SAME LANGUAGE as the input test case.',
+                    content: 'You are a senior QA engineer who reviews and improves test cases focused exclusively on the e-commerce website PNJ (Phú Nhuận Jewelry). Always consider PNJ\'s specific business context (jewelry, luxury goods, promotions, online shopping, store pickup) when improving test cases. Always respond with ONLY valid JSON. IMPORTANT: You MUST generate content in the SAME LANGUAGE as the input test case.',
                 },
                 {
                     role: 'user',

@@ -34,7 +34,7 @@ router.use(isAuthenticated);
 // @desc    Generate AI test case suggestions
 router.post('/suggest-testcases', upload.single('file'), async (req, res) => {
     try {
-        let { featureDescription } = req.body;
+        let { featureDescription, count } = req.body;
 
         // Handle optional file upload
         if (req.file) {
@@ -49,7 +49,17 @@ router.post('/suggest-testcases', upload.single('file'), async (req, res) => {
             return res.status(400).json({ message: 'Feature description or a document file is required' });
         }
 
-        const suggestions = await generateTestCaseSuggestions(featureDescription);
+        // If count not provided explicitly, try to detect from description
+        let testCaseCount = parseInt(count, 10);
+        if (!testCaseCount || isNaN(testCaseCount)) {
+            // Try to extract a number from the description ("create 3 test cases", "tạo 2 test case", etc.)
+            const match = featureDescription.match(/(\d+)\s*(test\s*case|tc)/i);
+            testCaseCount = match ? parseInt(match[1], 10) : null;
+        }
+        // Clamp between 1 and 20
+        if (testCaseCount) testCaseCount = Math.min(Math.max(testCaseCount, 1), 20);
+
+        const suggestions = await generateTestCaseSuggestions(featureDescription, testCaseCount);
         res.json({ suggestions });
     } catch (error) {
         console.error('AI suggestion error:', error);
