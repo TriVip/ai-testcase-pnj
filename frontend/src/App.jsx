@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TestCases from './pages/TestCases';
 import TestPlans from './pages/TestPlans';
+import Automation from './pages/Automation';
 
 const PrivateRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -49,6 +50,14 @@ function App() {
                         element={
                             <PrivateRoute>
                                 <TestPlans />
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
+                        path="/automation"
+                        element={
+                            <PrivateRoute>
+                                <Automation />
                             </PrivateRoute>
                         }
                     />

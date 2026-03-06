@@ -22,6 +22,12 @@ const IconTestPlans = () => (
     </svg>
 );
 
+const IconAutomation = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+);
+
 const IconLogout = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
@@ -55,6 +61,7 @@ const NAV_ITEMS = [
     { to: '/dashboard', label: 'Dashboard', icon: <IconDashboard /> },
     { to: '/testcases', label: 'Test Cases', icon: <IconTestCases /> },
     { to: '/testplans', label: 'Test Plans', icon: <IconTestPlans /> },
+    { to: '/automation', label: 'Automation Testing', icon: <IconAutomation /> },
 ];
 
 const Sidebar = () => {
@@ -75,6 +82,7 @@ const Sidebar = () => {
             if (e.key === '1') { e.preventDefault(); navigate('/dashboard'); }
             if (e.key === '2') { e.preventDefault(); navigate('/testcases'); }
             if (e.key === '3') { e.preventDefault(); navigate('/testplans'); }
+            if (e.key === '4') { e.preventDefault(); navigate('/automation'); }
         };
         window.addEventListener('keydown', handleKey);
         return () => window.removeEventListener('keydown', handleKey);
