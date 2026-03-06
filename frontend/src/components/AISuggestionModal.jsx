@@ -63,15 +63,17 @@ const AISuggestionModal = ({ onClose, onSuggestionsAdded }) => {
         try {
             toast.info(`Adding ${selectedSuggestions.size} test cases...`, 2000);
 
-            const promises = Array.from(selectedSuggestions).map(index => {
+            // Insert in reverse order so that when sorted by createdAt descending (newest first),
+            // the top suggestion from the modal appears at the top of the test cases list
+            const indices = Array.from(selectedSuggestions).sort((a, b) => b - a);
+
+            for (const index of indices) {
                 const suggestion = suggestions[index];
-                return testCasesAPI.create({
+                await testCasesAPI.create({
                     ...suggestion,
                     status: 'Draft',
                 });
-            });
-
-            await Promise.all(promises);
+            }
             toast.success(`Successfully added ${selectedSuggestions.size} test cases!`);
             onSuggestionsAdded();
             setTimeout(onClose, 1000); // Wait for toast to show

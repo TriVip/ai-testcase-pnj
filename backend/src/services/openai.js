@@ -33,7 +33,7 @@ export const generateTestCaseSuggestions = async (featureDescription) => {
 
 **Feature Description:** ${featureDescription}
 
-Generate 5-8 diverse test cases in the exact SAME LANGUAGE as the Feature Description (e.g., if the description is in Vietnamese, generate Vietnamese test cases), covering:
+Generate the number of test cases requested by the user in the Feature Description. If no specific number is mentioned, generate 5-8 diverse test cases. All test cases MUST be in the exact SAME LANGUAGE as the Feature Description (e.g., if the description is in Vietnamese, generate Vietnamese test cases). Ensure coverage across the following areas where applicable:
 1. **Happy Path** - Normal successful flows
 2. **Edge Cases** - Boundary values, limits, extremes
 3. **Error Handling** - Invalid inputs, error states
