@@ -65,4 +65,9 @@ export const aiAPI = {
     improveTestCase: (testCase) => api.post('/ai/improve-testcase', { testCase }),
 };
 
+// Jira API
+export const jiraAPI = {
+    createTicket: (data) => api.post('/jira/ticket', data),
+};
+
 export default api;

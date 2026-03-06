@@ -46,6 +46,9 @@ const testCaseSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
+        jiraTicketUrl: {
+            type: String,
+        },
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',

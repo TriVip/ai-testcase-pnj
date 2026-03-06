@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import AppShell from '../components/AppShell';
 import StatusTag from '../components/StatusTag';
-import { testPlansAPI, testCasesAPI } from '../services/api';
+import { testPlansAPI, testCasesAPI, jiraAPI } from '../services/api';
 import { exportTestPlanToXLSX } from '../utils/exportToXLSX';
 import TestPlanForm from '../components/TestPlanForm';
 
@@ -52,6 +52,7 @@ const TestPlans = () => {
     const [execStatus, setExecStatus] = useState('Pending');
     const [execNotes, setExecNotes] = useState('');
     const [deleting, setDeleting] = useState(false);
+    const [isCreatingJira, setIsCreatingJira] = useState(false);
 
     useEffect(() => { fetchTestPlans(); }, []);
 
@@ -103,6 +104,28 @@ const TestPlans = () => {
                 if (updated) setSelectedPlan(updated);
             }
         } catch { alert('Failed to update test case execution'); }
+    };
+
+    const handleCreateJiraTicket = async () => {
+        if (!selectedTC || !selectedPlan) return;
+        setIsCreatingJira(true);
+        try {
+            const res = await jiraAPI.createTicket({
+                testCaseId: selectedTC._id,
+                planId: selectedPlan._id
+            });
+            // Update local state
+            setSelectedTC(prev => ({ ...prev, jiraTicketUrl: res.data.ticketUrl }));
+            fetchTestPlans();
+
+            // Show toast or alert
+            alert('Jira ticket created successfully!');
+        } catch (error) {
+            console.error(error);
+            alert('Failed to create Jira ticket: ' + (error.response?.data?.message || 'Check console for details'));
+        } finally {
+            setIsCreatingJira(false);
+        }
     };
 
     const togglePlan = (id) => {
@@ -336,6 +359,27 @@ const TestPlans = () => {
                                                 </button>
                                             ))}
                                         </div>
+
+                                        {/* Jira Ticket Section */}
+                                        {selectedTC.executionStatus === 'Failed' && (
+                                            <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-surface-2)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--status-fail)' }}>
+                                                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: 'var(--space-2)' }}>Jira Integration</div>
+                                                {selectedTC.jiraTicketUrl ? (
+                                                    <a href={selectedTC.jiraTicketUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                                        View Jira Ticket
+                                                    </a>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleCreateJiraTicket}
+                                                        className="btn btn-primary btn-sm"
+                                                        disabled={isCreatingJira}
+                                                    >
+                                                        {isCreatingJira ? 'Creating...' : 'Create Jira Ticket'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : selectedPlan ? (
