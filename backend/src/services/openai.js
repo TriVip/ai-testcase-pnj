@@ -66,6 +66,7 @@ Make test cases:
             model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
             messages: [
                 {
+                    role: 'system',
                     content: 'You are a senior QA engineer who generates comprehensive, professional test cases focused exclusively on the e-commerce website PNJ (Phú Nhuận Jewelry). Always consider PNJ\'s specific business context (jewelry, luxury goods, promotions, online shopping, store pickup) when generating test cases. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (title, description, steps, expectedResult, actions) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
                 },
                 {
@@ -148,6 +149,7 @@ The test plan should be:
             model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
             messages: [
                 {
+                    role: 'system',
                     content: 'You are a senior QA lead who creates comprehensive test plans focused exclusively on the e-commerce website PNJ (Phú Nhuận Jewelry). Always consider PNJ\'s specific business context (jewelry, luxury goods, promotions, online shopping, store pickup) when creating test plans. Always respond with ONLY valid JSON, no markdown formatting or explanations. CRITICAL INSTRUCTION: If the user\'s input is in Vietnamese, you MUST generate all content (test scenarios, cases, descriptions, actions, expected results) entirely in Vietnamese language (tiếng Việt). Do not use English unless the user explicitly asks for English.',
                 },
                 {
@@ -216,6 +218,7 @@ Return ONLY a JSON object in this format:
             model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
             messages: [
                 {
+                    role: 'system',
                     content: 'You are a senior QA engineer who reviews and improves test cases focused exclusively on the e-commerce website PNJ (Phú Nhuận Jewelry). Always consider PNJ\'s specific business context (jewelry, luxury goods, promotions, online shopping, store pickup) when improving test cases. Always respond with ONLY valid JSON. IMPORTANT: You MUST generate content in the SAME LANGUAGE as the input test case.',
                 },
                 {
