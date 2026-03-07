@@ -4,6 +4,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import connectDB from './config/database.js';
 
 // Import routes
@@ -11,6 +13,7 @@ import authRoutes from './routes/auth.js';
 import testCaseRoutes from './routes/testCases.js';
 import testPlanRoutes from './routes/testPlans.js';
 import aiRoutes from './routes/ai.js';
+import workspaceRoutes from './routes/workspaces.js';
 // import jiraRoutes from './routes/jira.js';
 
 // Get __dirname equivalent in ES modules
@@ -26,7 +29,7 @@ const result = dotenv.config({ path: envPath });
 if (result.error) {
     console.warn('⚠️  Could not load .env file, using fallback values');
     process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/testcase-gen';
-    process.env.PORT = process.env.PORT || '9999';
+    process.env.PORT = process.env.PORT || '5000';
     process.env.NODE_ENV = process.env.NODE_ENV || 'development';
     process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
     process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -39,6 +42,41 @@ console.log('🔑 OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Found (' + pro
 
 // Initialize Express app
 const app = express();
+const httpServer = createServer(app);
+
+// Initialize Socket.io
+const io = new Server(httpServer, {
+    cors: {
+        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        credentials: true
+    }
+});
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+    console.log('⚡ Socket client connected:', socket.id);
+
+    socket.on('joinRoom', (roomId) => {
+        socket.join(roomId);
+        console.log(`Socket ${socket.id} joined room ${roomId}`);
+    });
+
+    socket.on('leaveRoom', (roomId) => {
+        socket.leave(roomId);
+        console.log(`Socket ${socket.id} left room ${roomId}`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('⚡ Socket client disconnected:', socket.id);
+    });
+});
+
+// Make io accessible to our router
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
 
 // Trust first proxy (Nginx) - required for correct cookie/IP handling behind reverse proxy
 app.set('trust proxy', 1);
@@ -60,6 +98,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/testcases', testCaseRoutes);
 app.use('/api/testplans', testPlanRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/workspaces', workspaceRoutes);
 // app.use('/api/jira', jiraRoutes);
 
 // Health check route
@@ -75,7 +114,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 9999;
-app.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT} (0.0.0.0)`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

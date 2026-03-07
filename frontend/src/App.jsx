@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TestCases from './pages/TestCases';
@@ -27,42 +28,44 @@ function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
-                <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route
-                        path="/dashboard"
-                        element={
-                            <PrivateRoute>
-                                <Dashboard />
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/testcases"
-                        element={
-                            <PrivateRoute>
-                                <TestCases />
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/testplans"
-                        element={
-                            <PrivateRoute>
-                                <TestPlans />
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/automation"
-                        element={
-                            <PrivateRoute>
-                                <Automation />
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route path="/" element={<Navigate to="/dashboard" />} />
-                </Routes>
+                <WorkspaceProvider>
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route
+                            path="/dashboard"
+                            element={
+                                <PrivateRoute>
+                                    <Dashboard />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/testcases"
+                            element={
+                                <PrivateRoute>
+                                    <TestCases />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/testplans"
+                            element={
+                                <PrivateRoute>
+                                    <TestPlans />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/automation"
+                            element={
+                                <PrivateRoute>
+                                    <Automation />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route path="/" element={<Navigate to="/dashboard" />} />
+                    </Routes>
+                </WorkspaceProvider>
             </AuthProvider>
         </BrowserRouter>
     );

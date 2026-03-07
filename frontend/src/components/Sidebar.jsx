@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import WorkspaceSelector from './WorkspaceSelector';
 
 // SVG icons — inline for zero dependency
 const IconDashboard = () => (
@@ -127,6 +128,8 @@ const Sidebar = () => {
                     <img src="/logo.png" alt="Logo" style={{ width: 52, height: 52, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.4))' }} />
                     <span className="sidebar-logo-text">QA Manager</span>
                 </div>
+
+                <WorkspaceSelector />
 
                 {/* Navigation */}
                 <nav className="sidebar-nav">

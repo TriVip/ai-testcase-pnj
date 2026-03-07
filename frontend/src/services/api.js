@@ -5,6 +5,17 @@ const api = axios.create({
     withCredentials: true,
 });
 
+// Add a request interceptor to include workspace ID
+api.interceptors.request.use((config) => {
+    const workspaceId = localStorage.getItem('activeWorkspaceId');
+    if (workspaceId) {
+        config.headers['x-workspace-id'] = workspaceId;
+    }
+    return config;
+}, (error) => {
+    return Promise.reject(error);
+});
+
 // Auth API
 export const authAPI = {
     getCurrentUser: () => api.get('/auth/current'),
@@ -68,6 +79,13 @@ export const aiAPI = {
 // Jira API
 export const jiraAPI = {
     createTicket: (data) => api.post('/jira/ticket', data),
+};
+
+// Workspaces API
+export const workspacesAPI = {
+    getAll: () => api.get('/workspaces'),
+    create: (data) => api.post('/workspaces', data),
+    invite: (id, email) => api.post(`/workspaces/${id}/invite`, { email }),
 };
 
 export default api;

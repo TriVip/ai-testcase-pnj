@@ -36,10 +36,14 @@ const upload = multer({
 router.use(isAuthenticated);
 
 // @route   GET /api/testcases
-// @desc    Get all test cases for current user
+// @desc    Get all test cases for current user in active workspace
 router.get('/', async (req, res) => {
     try {
-        const testCases = await TestCase.find({ user: req.userId }).sort({ createdAt: -1 });
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testCases = await TestCase.find(query).sort({ createdAt: -1 });
         res.json(testCases);
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -103,10 +107,12 @@ router.post('/import', upload.single('file'), async (req, res) => {
             });
         }
 
-        // Add user ID to all test cases
+        // Add user ID and workspace ID to all test cases
+        const workspaceId = req.headers['x-workspace-id'];
         const testCasesWithUser = validation.validTestCases.map(tc => ({
             ...tc,
             user: req.userId,
+            ...(workspaceId && { workspace: workspaceId }),
         }));
 
         // Bulk insert
@@ -137,11 +143,12 @@ router.post('/batch-delete', deleteLimiter, async (req, res) => {
             return res.status(400).json({ message: 'Maximum 50 items per batch delete' });
         }
 
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: { $in: ids }, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
         // Delete all test cases that belong to this user
-        const result = await TestCase.deleteMany({
-            _id: { $in: ids },
-            user: req.userId,
-        });
+        const result = await TestCase.deleteMany(query);
 
         // Clean up references in test plans and auto-obsolete empty plans
         const affectedPlans = await TestPlan.find({
@@ -171,7 +178,11 @@ router.post('/batch-delete', deleteLimiter, async (req, res) => {
 // @desc    Get single test case
 router.get('/:id', async (req, res) => {
     try {
-        const testCase = await TestCase.findOne({ _id: req.params.id, user: req.userId });
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testCase = await TestCase.findOne(query);
 
         if (!testCase) {
             return res.status(404).json({ message: 'Test case not found' });
@@ -187,9 +198,11 @@ router.get('/:id', async (req, res) => {
 // @desc    Create new test case
 router.post('/', async (req, res) => {
     try {
+        const workspaceId = req.headers['x-workspace-id'];
         const testCase = await TestCase.create({
             ...req.body,
             user: req.userId,
+            ...(workspaceId && { workspace: workspaceId }),
         });
 
         res.status(201).json(testCase);
@@ -202,14 +215,33 @@ router.post('/', async (req, res) => {
 // @desc    Update test case
 router.put('/:id', async (req, res) => {
     try {
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
         const testCase = await TestCase.findOneAndUpdate(
-            { _id: req.params.id, user: req.userId },
+            query,
             req.body,
             { new: true, runValidators: true }
         );
 
         if (!testCase) {
             return res.status(404).json({ message: 'Test case not found' });
+        }
+
+        // Emit real-time update if executionStatus was changed
+        if (req.body.executionStatus) {
+            const affectedPlans = await TestPlan.find({ testCases: testCase._id });
+            affectedPlans.forEach(plan => {
+                if (req.io) {
+                    req.io.to(plan._id.toString()).emit('testCaseStatusUpdated', {
+                        planId: plan._id,
+                        testCaseId: testCase._id,
+                        status: testCase.executionStatus,
+                        updatedBy: req.userId
+                    });
+                }
+            });
         }
 
         res.json(testCase);
@@ -222,7 +254,11 @@ router.put('/:id', async (req, res) => {
 // @desc    Delete test case
 router.delete('/:id', deleteLimiter, async (req, res) => {
     try {
-        const testCase = await TestCase.findOneAndDelete({ _id: req.params.id, user: req.userId });
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testCase = await TestCase.findOneAndDelete(query);
 
         if (!testCase) {
             return res.status(404).json({ message: 'Test case not found' });

@@ -42,6 +42,10 @@ const testPlanSchema = new mongoose.Schema(
             ref: 'User',
             required: true,
         },
+        workspace: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Workspace',
+        },
     },
     {
         timestamps: true,

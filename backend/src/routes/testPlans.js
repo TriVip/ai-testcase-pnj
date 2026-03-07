@@ -12,10 +12,14 @@ const router = express.Router();
 router.use(isAuthenticated);
 
 // @route   GET /api/testplans
-// @desc    Get all test plans for current user
+// @desc    Get all test plans for current user in active workspace
 router.get('/', async (req, res) => {
     try {
-        const testPlans = await TestPlan.find({ user: req.userId })
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testPlans = await TestPlan.find(query)
             .populate('testCases')
             .sort({ createdAt: -1 });
         res.json(testPlans);
@@ -28,7 +32,11 @@ router.get('/', async (req, res) => {
 // @desc    Get single test plan
 router.get('/:id', async (req, res) => {
     try {
-        const testPlan = await TestPlan.findOne({ _id: req.params.id, user: req.userId }).populate(
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testPlan = await TestPlan.findOne(query).populate(
             'testCases'
         );
 
@@ -46,9 +54,11 @@ router.get('/:id', async (req, res) => {
 // @desc    Create new test plan
 router.post('/', async (req, res) => {
     try {
+        const workspaceId = req.headers['x-workspace-id'];
         const testPlan = await TestPlan.create({
             ...req.body,
             user: req.userId,
+            ...(workspaceId && { workspace: workspaceId }),
         });
 
         res.status(201).json(testPlan);
@@ -61,8 +71,12 @@ router.post('/', async (req, res) => {
 // @desc    Update test plan
 router.put('/:id', async (req, res) => {
     try {
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
         const testPlan = await TestPlan.findOneAndUpdate(
-            { _id: req.params.id, user: req.userId },
+            query,
             req.body,
             { new: true, runValidators: true }
         ).populate('testCases');
@@ -81,7 +95,11 @@ router.put('/:id', async (req, res) => {
 // @desc    Delete test plan
 router.delete('/:id', deleteLimiter, async (req, res) => {
     try {
-        const testPlan = await TestPlan.findOneAndDelete({ _id: req.params.id, user: req.userId });
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testPlan = await TestPlan.findOneAndDelete(query);
 
         if (!testPlan) {
             return res.status(404).json({ message: 'Test plan not found' });
@@ -98,7 +116,11 @@ router.delete('/:id', deleteLimiter, async (req, res) => {
 router.post('/:id/testcases', async (req, res) => {
     try {
         const { testCaseId } = req.body;
-        const testPlan = await TestPlan.findOne({ _id: req.params.id, user: req.userId });
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testPlan = await TestPlan.findOne(query);
 
         if (!testPlan) {
             return res.status(404).json({ message: 'Test plan not found' });
@@ -120,7 +142,11 @@ router.post('/:id/testcases', async (req, res) => {
 // @desc    Remove test case from test plan
 router.delete('/:id/testcases/:testCaseId', async (req, res) => {
     try {
-        const testPlan = await TestPlan.findOne({ _id: req.params.id, user: req.userId });
+        const workspaceId = req.headers['x-workspace-id'];
+        const query = { _id: req.params.id, user: req.userId };
+        if (workspaceId) query.workspace = workspaceId;
+
+        const testPlan = await TestPlan.findOne(query);
 
         if (!testPlan) {
             return res.status(404).json({ message: 'Test plan not found' });
