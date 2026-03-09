@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { workspacesAPI } from '../services/api';
 
@@ -171,71 +172,81 @@ const WorkspaceSelector = () => {
 
             {/* Create Workspace Modal */}
             {
-                isCreateModalOpen && (
-                    <div className="modal-overlay" onClick={() => setIsCreateModalOpen(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                isCreateModalOpen && createPortal(
+                    <div className="modal-backdrop" onClick={() => setIsCreateModalOpen(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
                             <div className="modal-header">
-                                <h2>Create New Workspace</h2>
-                                <button className="modal-close" onClick={() => setIsCreateModalOpen(false)}>×</button>
+                                <h2 className="modal-title">Create New Workspace</h2>
+                                <button type="button" className="btn btn-ghost btn-icon" onClick={() => setIsCreateModalOpen(false)}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
                             </div>
-                            <form onSubmit={handleCreateWorkspace} style={{ padding: 20 }}>
-                                {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
-                                <div className="form-group">
-                                    <label className="form-label">Workspace Name</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        value={newWorkspaceName}
-                                        onChange={(e) => setNewWorkspaceName(e.target.value)}
-                                        placeholder="e.g. My Team, Project Alpha"
-                                        required
-                                        autoFocus
-                                    />
+                            <form onSubmit={handleCreateWorkspace}>
+                                <div className="modal-body" style={{ padding: '20px' }}>
+                                    {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
+                                    <div className="form-group">
+                                        <label className="form-label">Workspace Name</label>
+                                        <input
+                                            type="text"
+                                            className="input-field"
+                                            value={newWorkspaceName}
+                                            onChange={(e) => setNewWorkspaceName(e.target.value)}
+                                            placeholder="e.g. My Team, Project Alpha"
+                                            required
+                                            autoFocus
+                                        />
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-                                    <button type="button" className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary" disabled={isLoading || !newWorkspaceName.trim()}>
+                                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+                                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsCreateModalOpen(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary btn-sm" disabled={isLoading || !newWorkspaceName.trim()}>
                                         {isLoading ? 'Creating...' : 'Create Workspace'}
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )
             }
 
             {/* Invite Member Modal */}
             {
-                isInviteModalOpen && activeWorkspace && (
-                    <div className="modal-overlay" onClick={() => setIsInviteModalOpen(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                isInviteModalOpen && activeWorkspace && createPortal(
+                    <div className="modal-backdrop" onClick={() => setIsInviteModalOpen(false)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
                             <div className="modal-header">
-                                <h2>Invite to {activeWorkspace.name}</h2>
-                                <button className="modal-close" onClick={() => setIsInviteModalOpen(false)}>×</button>
+                                <h2 className="modal-title">Invite to {activeWorkspace.name}</h2>
+                                <button type="button" className="btn btn-ghost btn-icon" onClick={() => setIsInviteModalOpen(false)}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
                             </div>
-                            <form onSubmit={handleInviteMember} style={{ padding: 20 }}>
-                                {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
-                                <div className="form-group">
-                                    <label className="form-label">Member Email</label>
-                                    <input
-                                        type="email"
-                                        className="form-control"
-                                        value={inviteEmail}
-                                        onChange={(e) => setInviteEmail(e.target.value)}
-                                        placeholder="Email address of existing user"
-                                        required
-                                        autoFocus
-                                    />
+                            <form onSubmit={handleInviteMember}>
+                                <div className="modal-body" style={{ padding: '20px' }}>
+                                    {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
+                                    <div className="form-group">
+                                        <label className="form-label">Member Email</label>
+                                        <input
+                                            type="email"
+                                            className="input-field"
+                                            value={inviteEmail}
+                                            onChange={(e) => setInviteEmail(e.target.value)}
+                                            placeholder="Email address of existing user"
+                                            required
+                                            autoFocus
+                                        />
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-                                    <button type="button" className="btn btn-secondary" onClick={() => setIsInviteModalOpen(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary" disabled={isLoading || !inviteEmail.trim()}>
+                                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+                                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsInviteModalOpen(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary btn-sm" disabled={isLoading || !inviteEmail.trim()}>
                                         {isLoading ? 'Inviting...' : 'Invite Member'}
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )
             }
         </div >
