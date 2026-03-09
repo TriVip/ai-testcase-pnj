@@ -1,14 +1,14 @@
 import express from 'express';
 import Workspace from '../models/Workspace.js';
 import User from '../models/User.js';
-import { protect } from '../middleware/auth.js';
+import { isAuthenticated } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // @route   POST /api/workspaces
 // @desc    Create a new workspace
 // @access  Private
-router.post('/', protect, async (req, res) => {
+router.post('/', isAuthenticated, async (req, res) => {
     try {
         const { name } = req.body;
 
@@ -18,8 +18,8 @@ router.post('/', protect, async (req, res) => {
 
         const workspace = new Workspace({
             name,
-            createdBy: req.user._id,
-            members: [req.user._id],
+            createdBy: req.userId,
+            members: [req.userId],
         });
 
         const savedWorkspace = await workspace.save();
@@ -33,9 +33,9 @@ router.post('/', protect, async (req, res) => {
 // @route   GET /api/workspaces
 // @desc    Get all workspaces the user is part of
 // @access  Private
-router.get('/', protect, async (req, res) => {
+router.get('/', isAuthenticated, async (req, res) => {
     try {
-        const workspaces = await Workspace.find({ members: req.user._id })
+        const workspaces = await Workspace.find({ members: req.userId })
             .populate('createdBy', 'name email picture')
             .populate('members', 'name email picture')
             .sort({ createdAt: -1 });
@@ -50,7 +50,7 @@ router.get('/', protect, async (req, res) => {
 // @route   POST /api/workspaces/:id/invite
 // @desc    Invite a user to a workspace
 // @access  Private
-router.post('/:id/invite', protect, async (req, res) => {
+router.post('/:id/invite', isAuthenticated, async (req, res) => {
     try {
         const { email } = req.body;
         const workspaceId = req.params.id;
@@ -62,7 +62,7 @@ router.post('/:id/invite', protect, async (req, res) => {
         }
 
         // Only creator can invite 
-        if (workspace.createdBy.toString() !== req.user._id.toString()) {
+        if (workspace.createdBy.toString() !== req.userId.toString()) {
             return res.status(403).json({ message: 'Not authorized to invite members' });
         }
 
