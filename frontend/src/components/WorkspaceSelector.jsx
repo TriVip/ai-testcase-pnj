@@ -40,11 +40,14 @@ const WorkspaceSelector = () => {
             setIsLoading(true);
             setError(null);
             const res = await workspacesAPI.create({ name: newWorkspaceName });
-            await fetchWorkspaces();
-            setActiveWorkspace(res.data);
+            // Close modals first
             setIsCreateModalOpen(false);
             setNewWorkspaceName('');
             setIsDropdownOpen(false);
+
+            // Set active right away to avoid UI lag, then refetch
+            setActiveWorkspace(res.data);
+            await fetchWorkspaces();
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to create workspace');
         } finally {
@@ -142,26 +145,29 @@ const WorkspaceSelector = () => {
                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface-2)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                         >
-                            <IconPlus /> Create Workspace
+                            <IconPlus /> Create New Workspace
                         </button>
-
-                        {activeWorkspace && !activeWorkspace.isPersonal && (
-                            <button
-                                onClick={() => { setIsInviteModalOpen(true); setIsDropdownOpen(false); }}
-                                style={{
-                                    display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '8px 12px',
-                                    background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
-                                    fontSize: 'var(--text-sm)', fontWeight: 500, gap: 8, transition: 'background-color var(--transition-fast)'
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface-2)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                            >
-                                <IconUsers /> Invite Member
-                            </button>
-                        )}
                     </div>
-                )
-            }
+                )}
+
+            {activeWorkspace && !activeWorkspace.isPersonal && (
+                <button
+                    onClick={() => setIsInviteModalOpen(true)}
+                    style={{
+                        display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        padding: '6px 12px', marginTop: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 'var(--radius)', color: 'var(--text-on-sidebar-active)', cursor: 'pointer',
+                        fontSize: '11px', fontWeight: 600, transition: 'var(--transition)'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                    title="Invite members to this workspace"
+                >
+                    <IconUsers /> Invite Team Members
+                </button>
+            )}
 
             {/* Create Workspace Modal */}
             {
