@@ -11,6 +11,11 @@ export default defineConfig({
                 target: 'http://127.0.0.1:9999',
                 changeOrigin: true,
             },
+            '/socket.io': {
+                target: 'http://127.0.0.1:9999',
+                ws: true,
+                changeOrigin: true,
+            },
         },
     },
 });

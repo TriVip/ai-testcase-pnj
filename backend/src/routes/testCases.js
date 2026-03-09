@@ -40,8 +40,7 @@ router.use(isAuthenticated);
 router.get('/', async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { user: req.userId };
-        if (workspaceId) query.workspace = workspaceId;
+        const query = workspaceId ? { workspace: workspaceId } : { user: req.userId };
 
         const testCases = await TestCase.find(query).sort({ createdAt: -1 });
         res.json(testCases);
@@ -144,8 +143,9 @@ router.post('/batch-delete', deleteLimiter, async (req, res) => {
         }
 
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: { $in: ids }, user: req.userId };
+        const query = { _id: { $in: ids } };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         // Delete all test cases that belong to this user
         const result = await TestCase.deleteMany(query);
@@ -179,8 +179,9 @@ router.post('/batch-delete', deleteLimiter, async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testCase = await TestCase.findOne(query);
 
@@ -216,8 +217,9 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testCase = await TestCase.findOneAndUpdate(
             query,
@@ -255,8 +257,9 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', deleteLimiter, async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testCase = await TestCase.findOneAndDelete(query);
 

@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 
-const socket = io(import.meta.env.VITE_API_URL || 'http://127.0.0.1:9999', {
+const socket = io({
+    path: '/socket.io',
     withCredentials: true,
     autoConnect: false, // We'll connect manually when needed
 });

@@ -16,8 +16,7 @@ router.use(isAuthenticated);
 router.get('/', async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { user: req.userId };
-        if (workspaceId) query.workspace = workspaceId;
+        const query = workspaceId ? { workspace: workspaceId } : { user: req.userId };
 
         const testPlans = await TestPlan.find(query)
             .populate('testCases')
@@ -33,8 +32,9 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testPlan = await TestPlan.findOne(query).populate(
             'testCases'
@@ -72,8 +72,9 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testPlan = await TestPlan.findOneAndUpdate(
             query,
@@ -96,8 +97,9 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', deleteLimiter, async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testPlan = await TestPlan.findOneAndDelete(query);
 
@@ -117,8 +119,9 @@ router.post('/:id/testcases', async (req, res) => {
     try {
         const { testCaseId } = req.body;
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testPlan = await TestPlan.findOne(query);
 
@@ -143,8 +146,9 @@ router.post('/:id/testcases', async (req, res) => {
 router.delete('/:id/testcases/:testCaseId', async (req, res) => {
     try {
         const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id, user: req.userId };
+        const query = { _id: req.params.id };
         if (workspaceId) query.workspace = workspaceId;
+        else query.user = req.userId;
 
         const testPlan = await TestPlan.findOne(query);
 
