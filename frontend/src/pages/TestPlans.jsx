@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import AppShell from '../components/AppShell';
 import StatusTag from '../components/StatusTag';
 import { testPlansAPI, testCasesAPI, jiraAPI } from '../services/api';
+import socket from '../services/socket';
 import { exportTestPlanToXLSX } from '../utils/exportToXLSX';
 import TestPlanForm from '../components/TestPlanForm';
 
@@ -54,13 +55,73 @@ const TestPlans = () => {
     const [deleting, setDeleting] = useState(false);
     const [isCreatingJira, setIsCreatingJira] = useState(false);
 
-    useEffect(() => { fetchTestPlans(); }, []);
+    useEffect(() => {
+        fetchTestPlans();
+
+        socket.connect();
+        return () => {
+            socket.disconnect();
+        };
+    }, []);
+
+    // Socket.io real-time updates for Test Plan
+    useEffect(() => {
+        if (!selectedPlan) return;
+
+        // Join the room for this specific test plan
+        socket.emit('joinRoom', selectedPlan._id);
+
+        const handleTestCaseUpdate = (data) => {
+            const { planId, testCaseId, status } = data;
+
+            // Only update if it's for the currently selected plan
+            if (planId === selectedPlan._id) {
+                // Update test case list in the selected plan
+                setSelectedPlan((prevPlan) => {
+                    if (!prevPlan) return prevPlan;
+
+                    const updatedTestCases = prevPlan.testCases.map(tc => {
+                        if (tc._id === testCaseId) {
+                            return { ...tc, executionStatus: status };
+                        }
+                        return tc;
+                    });
+
+                    return { ...prevPlan, testCases: updatedTestCases };
+                });
+
+                // Set selected TC status if it's currently open
+                setSelectedTC((prevTc) => {
+                    if (prevTc && prevTc._id === testCaseId) {
+                        return { ...prevTc, executionStatus: status };
+                    }
+                    return prevTc;
+                });
+
+                // Update the stats in the testPlans list array subtly
+                setTestPlans((prevList) => prevList.map(p => {
+                    if (p._id === planId) {
+                        const updatedTcs = p.testCases.map(tc => tc._id === testCaseId ? { ...tc, executionStatus: status } : tc);
+                        return { ...p, testCases: updatedTcs };
+                    }
+                    return p;
+                }));
+            }
+        };
+
+        socket.on('testCaseStatusUpdated', handleTestCaseUpdate);
+
+        return () => {
+            socket.off('testCaseStatusUpdated', handleTestCaseUpdate);
+            socket.emit('leaveRoom', selectedPlan._id);
+        };
+    }, [selectedPlan?._id]);
 
     const fetchTestPlans = async () => {
         try {
             const res = await testPlansAPI.getAll();
             setTestPlans(res.data || []);
-        } catch { console.error('Failed to load plans'); }
+        } catch (err) { console.error('Failed to load plans', err); }
         finally { setLoading(false); }
     };
 

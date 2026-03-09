@@ -1,8 +1,35 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import Workspace from '../models/Workspace.js';
+import TestCase from '../models/TestCase.js';
+import TestPlan from '../models/TestPlan.js';
 
 const router = express.Router();
+
+// Helper to ensure a personal workspace exists and migrates orphaned data
+const ensurePersonalWorkspace = async (userId, userName) => {
+    let workspace = await Workspace.findOne({ createdBy: userId, isPersonal: true });
+    if (!workspace) {
+        workspace = await Workspace.create({
+            name: `${userName}'s Personal Workspace`,
+            createdBy: userId,
+            members: [userId],
+            isPersonal: true
+        });
+
+        // Migrate orphaned test cases and test plans
+        await TestCase.updateMany(
+            { user: userId, workspace: { $exists: false } },
+            { $set: { workspace: workspace._id } }
+        );
+        await TestPlan.updateMany(
+            { user: userId, workspace: { $exists: false } },
+            { $set: { workspace: workspace._id } }
+        );
+    }
+    return workspace;
+};
 
 // @route   POST /api/auth/register
 // @desc    Register new user
@@ -23,6 +50,9 @@ router.post('/register', async (req, res) => {
             email,
             name,
         });
+
+        // Ensure personal workspace
+        await ensurePersonalWorkspace(user._id, user.name);
 
         // Generate JWT token
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
@@ -71,6 +101,9 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
+        // Ensure personal workspace (also acts as migration for existing users)
+        await ensurePersonalWorkspace(user._id, user.name);
+
         // Generate JWT token
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
             expiresIn: '7d',
@@ -117,6 +150,9 @@ router.get('/current', async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
+
+        // Ensure personal workspace for already logged-in users
+        await ensurePersonalWorkspace(user._id, user.name);
 
         res.json(user);
     } catch (error) {
