@@ -86,7 +86,7 @@ router.get('/template', async (req, res, next) => {
         const format = req.query.format || 'xlsx';
 
         if (format === 'xlsx') {
-            const buffer = generateXLSXTemplate();
+            const buffer = await generateXLSXTemplate();
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             res.setHeader('Content-Disposition', 'attachment; filename=test-cases-template.xlsx');
             res.send(buffer);
@@ -116,7 +116,7 @@ router.post('/import', upload.single('file'), async (req, res, next) => {
 
         // Parse file based on type
         if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-            testCases = parseXLSX(req.file.buffer);
+            testCases = await parseXLSX(req.file.buffer);
         } else if (fileExtension === 'csv') {
             testCases = await parseCSV(req.file.buffer);
         } else {

@@ -1,17 +1,71 @@
-import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
 
 /**
- * Parse XLSX file buffer and return array of test case objects
+ * Read the value of a cell as a plain string.
+ *
+ * ExcelJS returns rich objects for some cell types rather than primitives —
+ * formulas carry { result }, hyperlinks carry { text }, and styled text arrives
+ * as { richText: [...] }. Flattening here keeps transformRowToTestCase working
+ * with plain strings regardless of how the sheet was authored.
  */
-const parseXLSX = (buffer) => {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet);
+const cellToString = (value) => {
+    if (value === null || value === undefined) return '';
+    if (value instanceof Date) return value.toISOString();
 
-    return data.map(row => transformRowToTestCase(row));
+    if (typeof value === 'object') {
+        if (Array.isArray(value.richText)) {
+            return value.richText.map((part) => part.text).join('');
+        }
+        if (value.text !== undefined) return String(value.text);
+        if (value.result !== undefined) return String(value.result);
+        if (value.hyperlink !== undefined) return String(value.hyperlink);
+        return '';
+    }
+
+    return String(value);
+};
+
+/**
+ * Parse XLSX file buffer and return array of test case objects.
+ *
+ * Async because ExcelJS parses from a buffer asynchronously.
+ */
+const parseXLSX = async (buffer) => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) return [];
+
+    // Row 1 holds the headers; every later row becomes one object keyed by them.
+    const headerRow = worksheet.getRow(1);
+    const headers = [];
+    headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        headers[colNumber] = cellToString(cell.value).trim();
+    });
+
+    const rows = [];
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+
+        const record = {};
+        let hasValue = false;
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            const key = headers[colNumber];
+            if (!key) return;
+            const value = cellToString(cell.value);
+            record[key] = value;
+            if (value !== '') hasValue = true;
+        });
+
+        // Skip rows that are entirely blank — trailing empty rows are common in
+        // hand-edited spreadsheets and would otherwise fail validation.
+        if (hasValue) rows.push(record);
+    });
+
+    return rows.map(row => transformRowToTestCase(row));
 };
 
 /**
@@ -37,33 +91,67 @@ const parseCSV = (buffer) => {
 };
 
 /**
+ * Turn the Steps cell into the shape the TestCase model stores.
+ *
+ * The model holds steps as subdocuments ({ stepNumber, action, expectedResult }),
+ * but the import format carries them as text — either pipe-separated or a JSON
+ * array — so they have to be converted. Previously this returned plain strings,
+ * which Mongoose could not cast, and importing the template this app generates
+ * failed with a CastError.
+ *
+ * The sheet has one "Expected Result" column for the whole row rather than one
+ * per step, so that value is attached to the final step, which is where the
+ * overall outcome belongs.
+ */
+const parseSteps = (rawValue, rowExpectedResult) => {
+    let parts = [];
+
+    if (typeof rawValue === 'string' && rawValue.trim() !== '') {
+        try {
+            const fromJSON = JSON.parse(rawValue);
+            parts = Array.isArray(fromJSON) ? fromJSON : [rawValue];
+        } catch {
+            parts = rawValue.split('|').map(s => s.trim()).filter(Boolean);
+        }
+    } else if (Array.isArray(rawValue)) {
+        parts = rawValue;
+    }
+
+    const steps = parts.map((part, index) => {
+        // A JSON array may already hold objects; keep the fields it provides.
+        if (part && typeof part === 'object') {
+            return {
+                stepNumber: part.stepNumber ?? index + 1,
+                action: String(part.action ?? ''),
+                expectedResult: String(part.expectedResult ?? ''),
+            };
+        }
+        return {
+            stepNumber: index + 1,
+            action: String(part),
+            expectedResult: '',
+        };
+    });
+
+    if (steps.length > 0 && rowExpectedResult && !steps[steps.length - 1].expectedResult) {
+        steps[steps.length - 1].expectedResult = rowExpectedResult;
+    }
+
+    return steps;
+};
+
+/**
  * Transform a row from import file to test case object
  */
 const transformRowToTestCase = (row) => {
-    // Parse steps - support both pipe-separated and JSON array formats
-    let steps = [];
-    if (row.Steps || row.steps) {
-        const stepsValue = row.Steps || row.steps;
-        if (typeof stepsValue === 'string') {
-            // Try to parse as JSON first
-            try {
-                steps = JSON.parse(stepsValue);
-            } catch (e) {
-                // If not JSON, treat as pipe-separated
-                steps = stepsValue.split('|').map(s => s.trim()).filter(s => s);
-            }
-        } else if (Array.isArray(stepsValue)) {
-            steps = stepsValue;
-        }
-    }
+    const expectedResult = row['Expected Result'] || row.expectedResult || row['Expected_Result'] || '';
 
     return {
         title: row.Title || row.title || '',
         description: row.Description || row.description || '',
         category: row.Category || row.category || '',
         priority: row.Priority || row.priority || 'Medium',
-        steps: steps,
-        expectedResult: row['Expected Result'] || row.expectedResult || row['Expected_Result'] || '',
+        steps: parseSteps(row.Steps ?? row.steps, expectedResult),
         executionStatus: row['Execution Status'] || row.executionStatus || row['Execution_Status'] || 'Pending',
         executionNotes: row['Execution Notes'] || row.executionNotes || row['Execution_Notes'] || '',
     };

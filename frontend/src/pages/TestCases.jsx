@@ -126,6 +126,17 @@ const TestCases = () => {
         }
     };
 
+    // Building the workbook is async now, so a failure would otherwise surface
+    // only as an unhandled rejection with nothing shown to the user.
+    const handleExport = async (rows) => {
+        try {
+            await exportTestCasesToXLSX(rows);
+        } catch (err) {
+            console.error('Export failed:', err);
+            toast.error('Failed to export XLSX');
+        }
+    };
+
     const handleImprove = async (tc) => {
         if (!confirm('Let AI improve this test case?')) return;
         setImprovingId(tc._id);
@@ -245,7 +256,7 @@ const TestCases = () => {
                                 Import
                             </button>
                             <button
-                                onClick={() => exportTestCasesToXLSX(filtered)}
+                                onClick={() => handleExport(filtered)}
                                 className="btn btn-secondary btn-sm"
                                 disabled={filtered.length === 0}
                             >
@@ -327,7 +338,7 @@ const TestCases = () => {
                                 {deleting ? 'Deleting…' : 'Delete selected'}
                             </button>
                             <button
-                                onClick={() => exportTestCasesToXLSX(testCases.filter(tc => selectedIds.has(tc._id)))}
+                                onClick={() => handleExport(testCases.filter(tc => selectedIds.has(tc._id)))}
                                 style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '3px 10px', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
                             >
                                 Export selected
