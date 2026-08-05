@@ -5,9 +5,16 @@ const api = axios.create({
     withCredentials: true,
 });
 
+export const ACTIVE_WORKSPACE_KEY = 'activeWorkspaceId';
+
+// Emitted when the server rejects the cached workspace id. WorkspaceContext
+// listens for it and reloads the workspace list so the selector stops showing
+// a workspace the user can no longer reach.
+export const WORKSPACE_ACCESS_DENIED_EVENT = 'workspace-access-denied';
+
 // Add a request interceptor to include workspace ID
 api.interceptors.request.use((config) => {
-    const workspaceId = localStorage.getItem('activeWorkspaceId');
+    const workspaceId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
     if (workspaceId) {
         config.headers['x-workspace-id'] = workspaceId;
     }
@@ -15,6 +22,50 @@ api.interceptors.request.use((config) => {
 }, (error) => {
     return Promise.reject(error);
 });
+
+// Recover from a stale workspace id.
+//
+// The active workspace lives in localStorage and is sent on every request. It
+// can stop being valid while the app is open — the user is removed from the
+// workspace, or it is deleted — and the server answers 403 from then on. Left
+// alone the app would keep replaying the bad id and every page would fail until
+// a manual reload.
+//
+// On that specific 403 we drop the cached id, tell WorkspaceContext to refresh,
+// and replay the request once. The retry runs through the request interceptor
+// again, finds no id to attach, and comes back scoped to the user's own data —
+// so the page renders instead of showing an error.
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const { response, config } = error;
+
+        const isStaleWorkspace =
+            response?.status === 403 &&
+            response.data?.code === 'WORKSPACE_ACCESS_DENIED';
+
+        // `_workspaceRetry` guards against a loop: if the replay fails too, the
+        // error propagates to the caller instead of retrying forever.
+        if (!isStaleWorkspace || !config || config._workspaceRetry) {
+            return Promise.reject(error);
+        }
+
+        // Parallel requests can all fail on the same stale id. Only the first
+        // one to clear it announces the change, so the context refetches once.
+        const hadStaleId = localStorage.getItem(ACTIVE_WORKSPACE_KEY) !== null;
+        localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+        if (hadStaleId) {
+            window.dispatchEvent(new CustomEvent(WORKSPACE_ACCESS_DENIED_EVENT));
+        }
+
+        config._workspaceRetry = true;
+        // The rejected header is still on this config object. The request
+        // interceptor only ever sets the header, never removes it, so without
+        // this the replay would resend the same stale id and fail again.
+        delete config.headers['x-workspace-id'];
+        return api(config);
+    }
+);
 
 // Auth API
 export const authAPI = {

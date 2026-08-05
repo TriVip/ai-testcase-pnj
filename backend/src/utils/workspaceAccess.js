@@ -24,12 +24,20 @@ export const userCanAccessWorkspace = async (userId, workspaceId) => {
 /**
  * Error thrown when a request names a workspace the caller isn't a member of.
  * Carries a 403 so the shared express error handler maps it correctly.
+ *
+ * `code` is what clients should branch on. Several unrelated conditions return
+ * 403 (declining an invite, for one), and the frontend reacts to this specific
+ * case by dropping the stale workspace id it had cached — matching on the
+ * human-readable message would break the moment that wording changes.
  */
+export const WORKSPACE_ACCESS_DENIED = 'WORKSPACE_ACCESS_DENIED';
+
 export class WorkspaceAccessError extends Error {
     constructor(message = 'Not authorized for this workspace') {
         super(message);
         this.name = 'WorkspaceAccessError';
         this.status = 403;
+        this.code = WORKSPACE_ACCESS_DENIED;
     }
 }
 
