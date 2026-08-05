@@ -6,11 +6,42 @@ import { isAuthenticated } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimit.js';
 import { parseXLSX, parseCSV, validateImportData } from '../utils/importUtils.js';
 import { generateXLSXTemplate, generateCSVTemplate } from '../utils/templateGenerator.js';
+import { buildScopeQuery, resolveWorkspaceForWrite } from '../utils/workspaceAccess.js';
 
 // Rate limiter: max 10 delete operations per 10 seconds per user
 const deleteLimiter = createRateLimiter({ windowMs: 10_000, max: 10, message: 'Too many delete requests. Please slow down.' });
 
 const router = express.Router();
+
+// Fields a client is allowed to set on a test case.
+//
+// `user` and `workspace` are deliberately absent: they are assigned from the
+// request context. Spreading req.body straight into create/update would let a
+// caller set those two fields and hand their own record to another account —
+// or pull someone else's record into their workspace.
+const ALLOWED_FIELDS = [
+    'title',
+    'description',
+    'steps',
+    'priority',
+    'status',
+    'category',
+    'feature',
+    'tags',
+    'executionStatus',
+    'executionNotes',
+    'jiraTicketUrl',
+];
+
+const pickAllowedFields = (source = {}) => {
+    const payload = {};
+    for (const field of ALLOWED_FIELDS) {
+        if (Object.prototype.hasOwnProperty.call(source, field)) {
+            payload[field] = source[field];
+        }
+    }
+    return payload;
+};
 
 // Configure multer for file upload
 const upload = multer({
@@ -37,21 +68,20 @@ router.use(isAuthenticated);
 
 // @route   GET /api/testcases
 // @desc    Get all test cases for current user in active workspace
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
     try {
-        const workspaceId = req.headers['x-workspace-id'];
-        const query = workspaceId ? { workspace: workspaceId } : { user: req.userId };
+        const query = await buildScopeQuery(req);
 
         const testCases = await TestCase.find(query).sort({ createdAt: -1 });
         res.json(testCases);
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        next(error);
     }
 });
 
 // @route   GET /api/testcases/template
 // @desc    Download import template (XLSX or CSV)
-router.get('/template', async (req, res) => {
+router.get('/template', async (req, res, next) => {
     try {
         const format = req.query.format || 'xlsx';
 
@@ -69,13 +99,13 @@ router.get('/template', async (req, res) => {
             res.status(400).json({ message: 'Invalid format. Use xlsx or csv.' });
         }
     } catch (error) {
-        res.status(500).json({ message: 'Failed to generate template', error: error.message });
+        next(error);
     }
 });
 
 // @route   POST /api/testcases/import
 // @desc    Import test cases from XLSX or CSV file
-router.post('/import', upload.single('file'), async (req, res) => {
+router.post('/import', upload.single('file'), async (req, res, next) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
@@ -107,9 +137,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
         }
 
         // Add user ID and workspace ID to all test cases
-        const workspaceId = req.headers['x-workspace-id'];
+        const workspaceId = await resolveWorkspaceForWrite(req);
         const testCasesWithUser = validation.validTestCases.map(tc => ({
-            ...tc,
+            ...pickAllowedFields(tc),
             user: req.userId,
             ...(workspaceId && { workspace: workspaceId }),
         }));
@@ -124,13 +154,13 @@ router.post('/import', upload.single('file'), async (req, res) => {
         });
     } catch (error) {
         console.error('Import error:', error);
-        res.status(500).json({ message: 'Failed to import test cases', error: error.message });
+        next(error);
     }
 });
 
 // @route   POST /api/testcases/batch-delete
 // @desc    Delete multiple test cases in a single request (max 50)
-router.post('/batch-delete', deleteLimiter, async (req, res) => {
+router.post('/batch-delete', deleteLimiter, async (req, res, next) => {
     try {
         const { ids } = req.body;
 
@@ -142,10 +172,7 @@ router.post('/batch-delete', deleteLimiter, async (req, res) => {
             return res.status(400).json({ message: 'Maximum 50 items per batch delete' });
         }
 
-        const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: { $in: ids } };
-        if (workspaceId) query.workspace = workspaceId;
-        else query.user = req.userId;
+        const query = await buildScopeQuery(req, { _id: { $in: ids } });
 
         // Delete all test cases that belong to this user
         const result = await TestCase.deleteMany(query);
@@ -170,18 +197,15 @@ router.post('/batch-delete', deleteLimiter, async (req, res) => {
             obsoletedPlans: affectedPlans.filter(p => p.status === 'Obsolete').map(p => p._id),
         });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        next(error);
     }
 });
 
 // @route   GET /api/testcases/:id
 // @desc    Get single test case
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
     try {
-        const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id };
-        if (workspaceId) query.workspace = workspaceId;
-        else query.user = req.userId;
+        const query = await buildScopeQuery(req, { _id: req.params.id });
 
         const testCase = await TestCase.findOne(query);
 
@@ -191,39 +215,36 @@ router.get('/:id', async (req, res) => {
 
         res.json(testCase);
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        next(error);
     }
 });
 
 // @route   POST /api/testcases
 // @desc    Create new test case
-router.post('/', async (req, res) => {
+router.post('/', async (req, res, next) => {
     try {
-        const workspaceId = req.headers['x-workspace-id'];
+        const workspaceId = await resolveWorkspaceForWrite(req);
         const testCase = await TestCase.create({
-            ...req.body,
+            ...pickAllowedFields(req.body),
             user: req.userId,
             ...(workspaceId && { workspace: workspaceId }),
         });
 
         res.status(201).json(testCase);
     } catch (error) {
-        res.status(400).json({ message: 'Failed to create test case', error: error.message });
+        next(error);
     }
 });
 
 // @route   PUT /api/testcases/:id
 // @desc    Update test case
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (req, res, next) => {
     try {
-        const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id };
-        if (workspaceId) query.workspace = workspaceId;
-        else query.user = req.userId;
+        const query = await buildScopeQuery(req, { _id: req.params.id });
 
         const testCase = await TestCase.findOneAndUpdate(
             query,
-            req.body,
+            pickAllowedFields(req.body),
             { new: true, runValidators: true }
         );
 
@@ -248,18 +269,15 @@ router.put('/:id', async (req, res) => {
 
         res.json(testCase);
     } catch (error) {
-        res.status(400).json({ message: 'Failed to update test case', error: error.message });
+        next(error);
     }
 });
 
 // @route   DELETE /api/testcases/:id
 // @desc    Delete test case
-router.delete('/:id', deleteLimiter, async (req, res) => {
+router.delete('/:id', deleteLimiter, async (req, res, next) => {
     try {
-        const workspaceId = req.headers['x-workspace-id'];
-        const query = { _id: req.params.id };
-        if (workspaceId) query.workspace = workspaceId;
-        else query.user = req.userId;
+        const query = await buildScopeQuery(req, { _id: req.params.id });
 
         const testCase = await TestCase.findOneAndDelete(query);
 
@@ -286,7 +304,7 @@ router.delete('/:id', deleteLimiter, async (req, res) => {
             obsoletedPlans: affectedPlans.filter(p => p.status === 'Obsolete').map(p => p._id),
         });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        next(error);
     }
 });
 

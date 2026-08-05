@@ -1,13 +1,13 @@
 import express from 'express';
 import axios from 'axios';
-import { protect } from '../middleware/auth.js';
+import { isAuthenticated } from '../middleware/auth.js';
 import TestCase from '../models/TestCase.js';
 
 const router = express.Router();
 
 // POST /api/jira/ticket
 // Create a Jira ticket for a failed test case
-router.post('/ticket', protect, async (req, res) => {
+router.post('/ticket', isAuthenticated, async (req, res) => {
     try {
         const { testCaseId, planId } = req.body;
 

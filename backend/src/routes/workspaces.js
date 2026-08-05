@@ -8,7 +8,7 @@ const router = express.Router();
 // @route   POST /api/workspaces
 // @desc    Create a new workspace
 // @access  Private
-router.post('/', isAuthenticated, async (req, res) => {
+router.post('/', isAuthenticated, async (req, res, next) => {
     try {
         const { name } = req.body;
 
@@ -26,14 +26,14 @@ router.post('/', isAuthenticated, async (req, res) => {
         res.status(201).json(savedWorkspace);
     } catch (error) {
         console.error('Error creating workspace:', error);
-        res.status(500).json({ message: 'Failed to create workspace', error: error.message });
+        next(error);
     }
 });
 
 // @route   GET /api/workspaces
 // @desc    Get all workspaces the user is part of
 // @access  Private
-router.get('/', isAuthenticated, async (req, res) => {
+router.get('/', isAuthenticated, async (req, res, next) => {
     try {
         const workspaces = await Workspace.find({ members: req.userId })
             .populate('createdBy', 'name email picture')
@@ -43,14 +43,14 @@ router.get('/', isAuthenticated, async (req, res) => {
         res.json(workspaces);
     } catch (error) {
         console.error('Error fetching workspaces:', error);
-        res.status(500).json({ message: 'Failed to fetch workspaces', error: error.message });
+        next(error);
     }
 });
 
 // @route   POST /api/workspaces/:id/invite
 // @desc    Invite a user to a workspace
 // @access  Private
-router.post('/:id/invite', isAuthenticated, async (req, res) => {
+router.post('/:id/invite', isAuthenticated, async (req, res, next) => {
     try {
         const { email } = req.body;
         const workspaceId = req.params.id;
@@ -85,7 +85,7 @@ router.post('/:id/invite', isAuthenticated, async (req, res) => {
         res.json(updatedWorkspace);
     } catch (error) {
         console.error('Error inviting member:', error);
-        res.status(500).json({ message: 'Failed to invite member', error: error.message });
+        next(error);
     }
 });
 
