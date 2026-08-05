@@ -1,48 +1,84 @@
-import * as XLSX from 'xlsx';
+/**
+ * Load ExcelJS on demand.
+ *
+ * The library is roughly as large as the rest of the app, and exporting is an
+ * occasional action, so importing it at module scope would double the initial
+ * bundle for every visitor. A dynamic import lets the bundler split it into its
+ * own chunk that is fetched the first time someone exports. The browser caches
+ * the module afterwards, so repeat exports do not re-download it.
+ */
+const loadExcelJS = async () => (await import('exceljs')).default;
 
-export const exportTestCasesToXLSX = (testCases, filename = 'test-cases.xlsx') => {
-    // Prepare data for Excel
-    const data = testCases.map((tc, index) => ({
-        'No.': index + 1,
-        'Title': tc.title,
-        'Description': tc.description,
-        'Priority': tc.priority,
-        'Status': tc.status,
-        'Category': tc.category,
-        'Steps': tc.steps.map((step, i) =>
-            `${i + 1}. ${step.action} | Expected: ${step.expectedResult}`
-        ).join('\n'),
-        'Tags': tc.tags?.join(', ') || '',
-        'Created': new Date(tc.createdAt).toLocaleDateString(),
-    }));
+/**
+ * Write a workbook to the browser as a download.
+ *
+ * ExcelJS has no browser-side `writeFile`, so the buffer is wrapped in a Blob
+ * and handed to a temporary anchor. The object URL is revoked afterwards to
+ * avoid holding the buffer in memory for the life of the page.
+ */
+const downloadWorkbook = async (workbook, filename) => {
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
 
-    // Create worksheet
-    const worksheet = XLSX.utils.json_to_sheet(data);
-
-    // Set column widths
-    const columnWidths = [
-        { wch: 5 },  // No.
-        { wch: 30 }, // Title
-        { wch: 40 }, // Description
-        { wch: 10 }, // Priority
-        { wch: 10 }, // Status
-        { wch: 15 }, // Category
-        { wch: 50 }, // Steps
-        { wch: 20 }, // Tags
-        { wch: 12 }, // Created
-    ];
-    worksheet['!cols'] = columnWidths;
-
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Test Cases');
-
-    // Save file
-    XLSX.writeFile(workbook, filename);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 };
 
-export const exportTestPlanToXLSX = (testPlan, filename = 'test-plan.xlsx') => {
-    // Prepare test plan info
+export const exportTestCasesToXLSX = async (testCases, filename = 'test-cases.xlsx') => {
+    const ExcelJS = await loadExcelJS();
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Test Cases');
+
+    worksheet.columns = [
+        { header: 'No.', key: 'no', width: 5 },
+        { header: 'Title', key: 'title', width: 30 },
+        { header: 'Description', key: 'description', width: 40 },
+        { header: 'Priority', key: 'priority', width: 10 },
+        { header: 'Status', key: 'status', width: 10 },
+        { header: 'Category', key: 'category', width: 15 },
+        { header: 'Steps', key: 'steps', width: 50 },
+        { header: 'Tags', key: 'tags', width: 20 },
+        { header: 'Created', key: 'created', width: 12 },
+    ];
+    worksheet.getRow(1).font = { bold: true };
+
+    testCases.forEach((tc, index) => {
+        worksheet.addRow({
+            no: index + 1,
+            title: tc.title,
+            description: tc.description,
+            priority: tc.priority,
+            status: tc.status,
+            category: tc.category,
+            steps: (tc.steps || []).map((step, i) =>
+                `${i + 1}. ${step.action} | Expected: ${step.expectedResult}`
+            ).join('\n'),
+            tags: tc.tags?.join(', ') || '',
+            created: tc.createdAt ? new Date(tc.createdAt).toLocaleDateString() : '',
+        });
+    });
+
+    // Steps holds newline-separated text; without this the cell renders as one
+    // long line.
+    worksheet.getColumn('steps').alignment = { wrapText: true, vertical: 'top' };
+
+    await downloadWorkbook(workbook, filename);
+};
+
+export const exportTestPlanToXLSX = async (testPlan, filename = 'test-plan.xlsx') => {
+    const ExcelJS = await loadExcelJS();
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Test Plan');
+
+    // Plan summary as label/value pairs, then a blank row before the table.
     const planInfo = [
         ['Test Plan Name', testPlan.name],
         ['Description', testPlan.description],
@@ -50,27 +86,35 @@ export const exportTestPlanToXLSX = (testPlan, filename = 'test-plan.xlsx') => {
         ['Start Date', testPlan.startDate ? new Date(testPlan.startDate).toLocaleDateString() : 'N/A'],
         ['End Date', testPlan.endDate ? new Date(testPlan.endDate).toLocaleDateString() : 'N/A'],
         ['Total Test Cases', testPlan.testCases?.length || 0],
-        [],
     ];
+    planInfo.forEach((row) => worksheet.addRow(row));
+    worksheet.getColumn(1).font = { bold: true };
+    worksheet.addRow([]);
 
-    // Prepare test cases data
-    const testCasesData = testPlan.testCases?.map((tc, index) => ({
-        'No.': index + 1,
-        'Title': tc.title,
-        'Description': tc.description,
-        'Priority': tc.priority,
-        'Status': tc.status,
-        'Category': tc.category,
-    })) || [];
+    const headerRow = worksheet.addRow([
+        'No.', 'Title', 'Description', 'Priority', 'Status', 'Category',
+    ]);
+    headerRow.font = { bold: true };
 
-    // Create worksheet
-    const worksheet = XLSX.utils.aoa_to_sheet(planInfo);
-    XLSX.utils.sheet_add_json(worksheet, testCasesData, { origin: -1 });
+    (testPlan.testCases || []).forEach((tc, index) => {
+        worksheet.addRow([
+            index + 1,
+            tc.title,
+            tc.description,
+            tc.priority,
+            tc.status,
+            tc.category,
+        ]);
+    });
 
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Test Plan');
+    // Column 1 carries both the summary labels and the row numbers, so it is
+    // sized for the labels.
+    worksheet.getColumn(1).width = 18;
+    worksheet.getColumn(2).width = 30;
+    worksheet.getColumn(3).width = 40;
+    worksheet.getColumn(4).width = 10;
+    worksheet.getColumn(5).width = 10;
+    worksheet.getColumn(6).width = 15;
 
-    // Save file
-    XLSX.writeFile(workbook, filename);
+    await downloadWorkbook(workbook, filename);
 };

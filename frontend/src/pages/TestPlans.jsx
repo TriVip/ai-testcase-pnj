@@ -136,6 +136,17 @@ const TestPlans = () => {
         finally { setDeleting(false); }
     };
 
+    // Building the workbook is async now, so a failure would otherwise surface
+    // only as an unhandled rejection with nothing shown to the user.
+    const handleExport = async (plan) => {
+        try {
+            await exportTestPlanToXLSX(plan, `${plan.name.replace(/\s+/g, '-')}.xlsx`);
+        } catch (err) {
+            console.error('Export failed:', err);
+            alert('Failed to export XLSX');
+        }
+    };
+
     const handleEdit = (plan) => { setEditingTestPlan(plan); setShowForm(true); };
     const handleFormClose = () => { setShowForm(false); setEditingTestPlan(null); fetchTestPlans(); };
 
@@ -460,7 +471,7 @@ const TestPlans = () => {
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => exportTestPlanToXLSX(selectedPlan, `${selectedPlan.name.replace(/\s+/g, '-')}.xlsx`)}
+                                                onClick={() => handleExport(selectedPlan)}
                                                 className="btn btn-secondary btn-sm" title="Export"
                                             >
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
