@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json is committed on purpose. It is what pins transitive
+# dependencies to the exact versions that were audited; without it every
+# install re-resolves and can silently pull a vulnerable version back in.
 yarn.lock
 pnpm-lock.yaml
 
@@ -8,7 +10,10 @@ pnpm-lock.yaml
 .env
 .env.local
 .env.*.local
-.env.example
+# .env.example holds placeholders only and is tracked, so a fresh checkout can
+# see which variables are required (JWT_SECRET has a minimum strength the server
+# enforces at startup).
+!.env.example
 
 # Build outputs
 dist/
