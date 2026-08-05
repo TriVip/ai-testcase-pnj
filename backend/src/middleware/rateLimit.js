@@ -1,11 +1,17 @@
 /**
- * Simple in-memory rate limiter middleware (per-user, per-action).
+ * Simple in-memory rate limiter middleware (per-identity, per-endpoint).
  * No external dependencies needed.
  *
  * Usage:
  *   import { createRateLimiter } from '../middleware/rateLimit.js';
  *   const deleteLimiter = createRateLimiter({ windowMs: 10000, max: 10 });
  *   router.delete('/:id', deleteLimiter, handler);
+ *
+ * SCALING CAVEAT: counters live in this process's memory. They are not shared
+ * across replicas and reset on restart, so with N instances behind a load
+ * balancer the effective limit is `max * N`. Treat these as a best-effort
+ * brute-force and cost-abuse guard; a shared store (Redis) is needed for a
+ * hard limit.
  */
 
 const stores = new Map();
@@ -28,8 +34,12 @@ setInterval(() => {
  */
 export const createRateLimiter = ({ windowMs = 10_000, max = 10, message } = {}) => {
     return (req, res, next) => {
-        const userId = req.userId || req.ip;
-        const key = `${userId}:${req.baseUrl}`;
+        // Prefer the authenticated user id so a limit follows the account
+        // rather than the IP; fall back to IP for unauthenticated endpoints
+        // (login/register). The path is part of the key so each endpoint gets
+        // its own bucket instead of every route on a router sharing one.
+        const identity = req.userId || req.ip;
+        const key = `${identity}:${req.baseUrl || ''}${req.path || ''}`;
         const now = Date.now();
 
         let entry = stores.get(key);

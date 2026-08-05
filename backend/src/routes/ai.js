@@ -5,8 +5,17 @@ import {
     improveTestCase
 } from '../services/openai.js';
 import { isAuthenticated } from '../middleware/auth.js';
+import { createRateLimiter } from '../middleware/rateLimit.js';
 import multer from 'multer';
 import { extractTextFromFile } from '../utils/fileParser.js';
+
+// Every route here calls the paid OpenAI API, so an unthrottled caller can run
+// up a real bill. Applied after isAuthenticated so the limit keys per user.
+const aiLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: 'AI request limit reached. Please wait before trying again.',
+});
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -29,10 +38,11 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(isAuthenticated);
+router.use(aiLimiter);
 
 // @route   POST /api/ai/suggest-testcases
 // @desc    Generate AI test case suggestions
-router.post('/suggest-testcases', upload.single('file'), async (req, res) => {
+router.post('/suggest-testcases', upload.single('file'), async (req, res, next) => {
     try {
         let { featureDescription, count } = req.body;
 
@@ -63,13 +73,13 @@ router.post('/suggest-testcases', upload.single('file'), async (req, res) => {
         res.json({ suggestions });
     } catch (error) {
         console.error('AI suggestion error:', error);
-        res.status(500).json({ message: 'Failed to generate suggestions', error: error.message });
+        next(error);
     }
 });
 
 // @route   POST /api/ai/suggest-testplan
 // @desc    Generate AI test plan suggestions
-router.post('/suggest-testplan', async (req, res) => {
+router.post('/suggest-testplan', async (req, res, next) => {
     try {
         const { projectDescription } = req.body;
 
@@ -81,13 +91,13 @@ router.post('/suggest-testplan', async (req, res) => {
         res.json({ testPlan });
     } catch (error) {
         console.error('AI test plan suggestion error:', error);
-        res.status(500).json({ message: 'Failed to generate test plan', error: error.message });
+        next(error);
     }
 });
 
 // @route   POST /api/ai/improve-testcase
 // @desc    Improve existing test case using AI
-router.post('/improve-testcase', async (req, res) => {
+router.post('/improve-testcase', async (req, res, next) => {
     try {
         const { testCase } = req.body;
 
@@ -99,7 +109,7 @@ router.post('/improve-testcase', async (req, res) => {
         res.json({ improved });
     } catch (error) {
         console.error('AI improve test case error:', error);
-        res.status(500).json({ message: 'Failed to improve test case', error: error.message });
+        next(error);
     }
 });
 

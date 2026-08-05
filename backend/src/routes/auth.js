@@ -4,8 +4,29 @@ import User from '../models/User.js';
 import Workspace from '../models/Workspace.js';
 import TestCase from '../models/TestCase.js';
 import TestPlan from '../models/TestPlan.js';
+import { createRateLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
+
+const MIN_PASSWORD_LENGTH = 8;
+
+// These endpoints are unauthenticated, so the limiter keys by client IP.
+// A strict cap makes credential brute-force and signup spam impractical.
+const authLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'Too many authentication attempts. Please try again later.',
+});
+
+/**
+ * Read a credential field as a string.
+ *
+ * Anything that is not already a string (object, array, number, null) becomes
+ * an empty string rather than being passed through. This is what stops a body
+ * like { "username": { "$ne": null } } from reaching Mongo and being
+ * interpreted as a query operator instead of a value.
+ */
+const readCredential = (value) => (typeof value === 'string' ? value.trim() : '');
 
 // Helper to ensure a personal workspace exists and migrates orphaned data
 const ensurePersonalWorkspace = async (userId, userName) => {
@@ -33,9 +54,22 @@ const ensurePersonalWorkspace = async (userId, userName) => {
 
 // @route   POST /api/auth/register
 // @desc    Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
     try {
-        const { username, password, email, name } = req.body;
+        const username = readCredential(req.body.username);
+        const password = readCredential(req.body.password);
+        const email = readCredential(req.body.email);
+        const name = readCredential(req.body.name);
+
+        if (!username || !email || !name) {
+            return res.status(400).json({ message: 'Username, email and name are required' });
+        }
+
+        if (password.length < MIN_PASSWORD_LENGTH) {
+            return res.status(400).json({
+                message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+            });
+        }
 
         // Check if user already exists
         const existingUser = await User.findOne({ $or: [{ username }, { email }] });
@@ -43,10 +77,10 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Username or email already exists' });
         }
 
-        // Create new user (in production, hash password with bcrypt)
+        // Password is hashed by the pre-save hook on the User model.
         const user = await User.create({
             username,
-            password, // TODO: Hash password in production
+            password,
             email,
             name,
         });
@@ -68,6 +102,8 @@ router.post('/register', async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
+        // The JWT is delivered only through the httpOnly cookie above. Echoing
+        // it in the body would put it within reach of any XSS on the frontend.
         res.status(201).json({
             user: {
                 _id: user._id,
@@ -76,29 +112,47 @@ router.post('/register', async (req, res) => {
                 name: user.name,
                 picture: user.picture,
             },
-            token,
         });
     } catch (error) {
         console.error('Register error:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
 // @route   POST /api/auth/login
 // @desc    Login user
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const username = readCredential(req.body.username);
+        const password = readCredential(req.body.password);
 
-        // Find user
+        // Both fields must be present and non-empty. Mongoose strips keys whose
+        // value is `undefined`, so without this guard `findOne({ username })`
+        // would degrade to `findOne({})` and return an arbitrary account.
+        if (!username || !password) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
         const user = await User.findOne({ username });
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        // Check password (in production, use bcrypt.compare)
-        if (user.password !== password) {
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        // Migrate legacy plaintext passwords on successful login: re-saving the
+        // value lets the pre-save hook hash it, so accounts convert gradually
+        // without a bulk migration or a forced password reset.
+        if (user.isPasswordPlaintext()) {
+            user.password = password;
+            // Assigning the same string Mongoose already has leaves the field
+            // "unmodified", which would make the pre-save hook skip hashing and
+            // silently leave the password in plaintext. Force the dirty flag.
+            user.markModified('password');
+            await user.save();
         }
 
         // Ensure personal workspace (also acts as migration for existing users)
@@ -118,6 +172,7 @@ router.post('/login', async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
+        // Token stays in the httpOnly cookie only — see the note in /register.
         res.json({
             user: {
                 _id: user._id,
@@ -126,11 +181,10 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 picture: user.picture,
             },
-            token,
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
