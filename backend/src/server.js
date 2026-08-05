@@ -34,7 +34,10 @@ const result = dotenv.config({ path: envPath });
 if (result.error) {
     console.warn('⚠️  Could not load .env file, using fallback values');
     process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/testcase-gen';
-    process.env.PORT = process.env.PORT || '5000';
+    // Matches the fallback further down, and what the Vite proxy and
+    // docker-compose expect. This used to say 5000, so a missing .env put the
+    // server on a port nothing was talking to.
+    process.env.PORT = process.env.PORT || '9999';
     process.env.NODE_ENV = process.env.NODE_ENV || 'development';
     process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
     process.env.OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
