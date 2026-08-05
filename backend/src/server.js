@@ -248,7 +248,12 @@ app.use((err, req, res, next) => {
     const status = err.status || err.statusCode || 500;
 
     if (status < 500) {
-        return res.status(status).json({ message: err.message });
+        // Include `code` when the error carries one, so clients can branch on a
+        // stable identifier instead of parsing the message text.
+        return res.status(status).json({
+            message: err.message,
+            ...(err.code && { code: err.code }),
+        });
     }
 
     if (process.env.NODE_ENV === 'production') {

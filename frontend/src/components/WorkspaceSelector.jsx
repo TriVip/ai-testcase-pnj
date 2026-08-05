@@ -26,7 +26,14 @@ const IconUsers = () => (
 );
 
 const WorkspaceSelector = () => {
-    const { workspaces, activeWorkspace, setActiveWorkspace, fetchWorkspaces } = useWorkspace();
+    const {
+        workspaces,
+        activeWorkspace,
+        setActiveWorkspace,
+        fetchWorkspaces,
+        accessDeniedNotice,
+        dismissAccessDeniedNotice,
+    } = useWorkspace();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -77,6 +84,36 @@ const WorkspaceSelector = () => {
     return (
         <div style={{ padding: '0 16px', marginBottom: 16, position: 'relative' }}>
             <span className="sidebar-section-label" style={{ marginTop: 0 }}>WORKSPACE</span>
+
+            {/* Shown when the server rejected the workspace we had selected and
+                the app switched away from it on its own — without this the
+                selection would appear to change for no reason. */}
+            {accessDeniedNotice && (
+                <div
+                    role="status"
+                    style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8,
+                        padding: '8px 10px', borderRadius: 'var(--radius)',
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        color: 'var(--text-on-sidebar-active)', fontSize: 11, lineHeight: 1.4,
+                    }}
+                >
+                    <span style={{ flex: 1 }}>{accessDeniedNotice}</span>
+                    <button
+                        onClick={dismissAccessDeniedNotice}
+                        aria-label="Dismiss"
+                        style={{
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                            lineHeight: 0, color: 'inherit', opacity: 0.7, flexShrink: 0,
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+            )}
 
             <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
