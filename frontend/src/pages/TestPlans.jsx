@@ -18,6 +18,15 @@ const ChevronRight = () => (
     </svg>
 );
 
+// Sorts feature/module labels naturally ("2. Module 2" before "10. Module 10")
+// rather than lexicographically ("10." would otherwise sort before "2.") or by
+// insertion order. Insertion order reflects whatever sequence test cases
+// happened to be added to the plan in — e.g. working through the Test Cases
+// list, which defaults to newest-first — so it has no relationship to the
+// module numbering a feature name carries, and a bulk import (all rows
+// created in one pass, Module 1 first) reliably produced modules in reverse.
+const naturalCompare = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+
 const getStats = (plan) => {
     const tcs = plan.testCases || [];
     return {
@@ -342,8 +351,10 @@ const TestPlans = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Expanded: feature groups → TCs */}
-                                            {expandedPlans.has(plan._id) && Object.entries(byFeature).map(([feat, tcs]) => {
+                                            {/* Expanded: feature groups → TCs, in natural module order */}
+                                            {expandedPlans.has(plan._id) && Object.entries(byFeature)
+                                                .sort(([a], [b]) => naturalCompare(a, b))
+                                                .map(([feat, tcs]) => {
                                                 const fkey = `${plan._id}|${feat}`;
                                                 const featExpanded = expandedFeatures.has(fkey);
                                                 return (
