@@ -28,6 +28,28 @@ const authLimiter = createRateLimiter({
  */
 const readCredential = (value) => (typeof value === 'string' ? value.trim() : '');
 
+// The session cookie normally requires HTTPS (Secure) and allows cross-site
+// delivery (SameSite=None) so a frontend on a different origin than the API
+// still gets it. Browsers silently refuse to store a Secure cookie over plain
+// HTTP — without an escape hatch, a deployment reached over bare HTTP (no TLS
+// terminator in front of it, e.g. hitting an EC2 public IP directly) would
+// have login return 200 and then look logged-out on the very next request,
+// with no error to explain why.
+//
+// Set COOKIE_SECURE=false only for that situation. It is not a general "turn
+// off security" switch: sameSite drops to 'lax' (secure:false + sameSite:none
+// is rejected outright by browsers), and this should never be set on a
+// deployment that has TLS in front of it.
+const COOKIE_SECURE = process.env.COOKIE_SECURE !== 'false';
+
+const cookieOptions = {
+    httpOnly: true,
+    secure: COOKIE_SECURE,
+    sameSite: COOKIE_SECURE ? 'none' : 'lax',
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
 // Helper to ensure a personal workspace exists and migrates orphaned data
 const ensurePersonalWorkspace = async (userId, userName) => {
     let workspace = await Workspace.findOne({ createdBy: userId, isPersonal: true });
@@ -93,14 +115,7 @@ router.post('/register', authLimiter, async (req, res) => {
             expiresIn: '7d',
         });
 
-        // Set cookie (secure: true and sameSite: 'none' for production SSL cross-origin support)
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            path: '/',
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
+        res.cookie('token', token, cookieOptions);
 
         // The JWT is delivered only through the httpOnly cookie above. Echoing
         // it in the body would put it within reach of any XSS on the frontend.
@@ -163,14 +178,7 @@ router.post('/login', authLimiter, async (req, res) => {
             expiresIn: '7d',
         });
 
-        // Set cookie (secure: true and sameSite: 'none' for production SSL cross-origin support)
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            path: '/',
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        });
+        res.cookie('token', token, cookieOptions);
 
         // Token stays in the httpOnly cookie only — see the note in /register.
         res.json({
@@ -217,7 +225,9 @@ router.get('/current', async (req, res) => {
 // @route   POST /api/auth/logout
 // @desc    Logout user
 router.post('/logout', (req, res) => {
-    res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'none', path: '/' });
+    // clearCookie must be called with matching attributes, or some browsers
+    // treat it as a different cookie and never remove the original.
+    res.clearCookie('token', cookieOptions);
     res.json({ message: 'Logged out successfully' });
 });
 
