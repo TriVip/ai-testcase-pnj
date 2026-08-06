@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import AppShell from '../components/AppShell';
 import StatusTag from '../components/StatusTag';
 import { testCasesAPI, aiAPI } from '../services/api';
@@ -409,9 +409,12 @@ const TestCases = () => {
                                     </thead>
                                     <tbody>
                                         {pageSlice.map((tc, idx) => (
-                                            <>
+                                            // The fragment is the list child, so the key belongs here.
+                                            // Shorthand <> cannot take one, which is why React warned and
+                                            // why rows were reconciled by position — filtering or sorting
+                                            // could leave the expanded detail attached to the wrong row.
+                                            <Fragment key={tc._id}>
                                                 <tr
-                                                    key={tc._id}
                                                     className={selectedIds.has(tc._id) ? 'row-selected' : ''}
                                                     onClick={() => setExpandedRow(expandedRow === tc._id ? null : tc._id)}
                                                 >
@@ -521,7 +524,7 @@ const TestCases = () => {
                                                         </td>
                                                     </tr>
                                                 )}
-                                            </>
+                                            </Fragment>
                                         ))}
                                     </tbody>
                                 </table>
