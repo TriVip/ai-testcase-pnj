@@ -22,6 +22,9 @@ const router = express.Router();
 const ALLOWED_FIELDS = [
     'title',
     'description',
+    'externalId',
+    'preCondition',
+    'testData',
     'steps',
     'priority',
     'status',
@@ -30,6 +33,10 @@ const ALLOWED_FIELDS = [
     'tags',
     'executionStatus',
     'executionNotes',
+    'bugType',
+    'bugSeverity',
+    'fixStatus',
+    'bugId',
     'jiraTicketUrl',
 ];
 

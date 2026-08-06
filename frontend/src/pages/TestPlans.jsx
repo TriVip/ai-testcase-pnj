@@ -54,6 +54,9 @@ const TestPlans = () => {
     const [execNotes, setExecNotes] = useState('');
     const [deleting, setDeleting] = useState(false);
     const [isCreatingJira, setIsCreatingJira] = useState(false);
+    const [editingBug, setEditingBug] = useState(false);
+    const [bugForm, setBugForm] = useState({ bugType: '', bugSeverity: '', fixStatus: '', bugId: '' });
+    const [savingBug, setSavingBug] = useState(false);
 
     useEffect(() => {
         fetchTestPlans();
@@ -178,6 +181,21 @@ const TestPlans = () => {
         } catch { alert('Failed to update test case execution'); }
     };
 
+    const handleSaveBug = async () => {
+        if (!selectedTC) return;
+        setSavingBug(true);
+        try {
+            await testCasesAPI.update(selectedTC._id, bugForm);
+            setSelectedTC(prev => ({ ...prev, ...bugForm }));
+            setEditingBug(false);
+            fetchTestPlans();
+        } catch {
+            alert('Failed to save bug details');
+        } finally {
+            setSavingBug(false);
+        }
+    };
+
     const handleCreateJiraTicket = async () => {
         if (!selectedTC || !selectedPlan) return;
         setIsCreatingJira(true);
@@ -216,6 +234,14 @@ const TestPlans = () => {
             return s;
         });
     };
+
+    // Close the bug-edit form when switching to a different test case, so a
+    // stale open editor doesn't linger under whichever TC is selected next.
+    // Keyed on the id specifically — the socket handler above updates the same
+    // selectedTC object's fields in place, which must NOT trigger this reset.
+    useEffect(() => {
+        setEditingBug(false);
+    }, [selectedTC?._id]);
 
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
 
@@ -396,6 +422,20 @@ const TestPlans = () => {
                                             </div>
                                         )}
 
+                                        {selectedTC.preCondition && (
+                                            <div style={{ marginBottom: 'var(--space-5)' }}>
+                                                <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Pre-condition</div>
+                                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{selectedTC.preCondition}</p>
+                                            </div>
+                                        )}
+
+                                        {selectedTC.testData && (
+                                            <div style={{ marginBottom: 'var(--space-5)' }}>
+                                                <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Test Data</div>
+                                                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{selectedTC.testData}</p>
+                                            </div>
+                                        )}
+
                                         {selectedTC.steps?.length > 0 && (
                                             <div style={{ marginBottom: 'var(--space-5)' }}>
                                                 <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Test Steps</div>
@@ -417,7 +457,7 @@ const TestPlans = () => {
 
                                         <div className="section-label" style={{ marginBottom: 'var(--space-3)' }}>Mark Execution Result</div>
                                         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                            {['Pass', 'Failed', 'Pending'].map(st => (
+                                            {['Pass', 'Failed', 'Pending', 'N/A'].map(st => (
                                                 <button
                                                     key={st}
                                                     onClick={() => handleUpdateTCExecution(selectedTC._id, st)}
@@ -431,6 +471,92 @@ const TestPlans = () => {
                                                 </button>
                                             ))}
                                         </div>
+
+                                        {/* Bug Details — editable right where a failure is marked, since
+                                            that's the moment a bug is actually found. */}
+                                        {selectedTC.executionStatus === 'Failed' && (
+                                            <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--status-fail-bg)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--status-fail)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                                                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Bug Details</div>
+                                                    {!editingBug && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setBugForm({
+                                                                    bugType: selectedTC.bugType || '',
+                                                                    bugSeverity: selectedTC.bugSeverity || '',
+                                                                    fixStatus: selectedTC.fixStatus || '',
+                                                                    bugId: selectedTC.bugId || '',
+                                                                });
+                                                                setEditingBug(true);
+                                                            }}
+                                                            className="btn btn-ghost btn-sm"
+                                                        >
+                                                            {(selectedTC.bugType || selectedTC.bugSeverity || selectedTC.fixStatus || selectedTC.bugId) ? 'Edit' : '+ Log Bug'}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {editingBug ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)' }}>
+                                                            <select
+                                                                value={bugForm.bugType}
+                                                                onChange={e => setBugForm({ ...bugForm, bugType: e.target.value })}
+                                                                className="input-field"
+                                                            >
+                                                                <option value="">Type —</option>
+                                                                <option value="Bug">Bug</option>
+                                                                <option value="Đề xuất">Đề xuất</option>
+                                                            </select>
+                                                            <select
+                                                                value={bugForm.bugSeverity}
+                                                                onChange={e => setBugForm({ ...bugForm, bugSeverity: e.target.value })}
+                                                                className="input-field"
+                                                            >
+                                                                <option value="">Severity —</option>
+                                                                <option value="High">High</option>
+                                                                <option value="Medium">Medium</option>
+                                                                <option value="Low">Low</option>
+                                                            </select>
+                                                            <select
+                                                                value={bugForm.fixStatus}
+                                                                onChange={e => setBugForm({ ...bugForm, fixStatus: e.target.value })}
+                                                                className="input-field"
+                                                            >
+                                                                <option value="">Fix status —</option>
+                                                                <option value="Đã fix">Đã fix</option>
+                                                                <option value="Chưa fix">Chưa fix</option>
+                                                                <option value="Không fix">Không fix</option>
+                                                            </select>
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={bugForm.bugId}
+                                                            onChange={e => setBugForm({ ...bugForm, bugId: e.target.value })}
+                                                            className="input-field"
+                                                            placeholder="Bug ID, e.g. BUG-101"
+                                                        />
+                                                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                                            <button onClick={handleSaveBug} className="btn btn-primary btn-sm" disabled={savingBug}>
+                                                                {savingBug ? 'Saving…' : 'Save'}
+                                                            </button>
+                                                            <button onClick={() => setEditingBug(false)} className="btn btn-secondary btn-sm" disabled={savingBug}>
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    (selectedTC.bugType || selectedTC.bugSeverity || selectedTC.fixStatus || selectedTC.bugId) && (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                            {selectedTC.bugType && <span><strong>Type:</strong> {selectedTC.bugType}</span>}
+                                                            {selectedTC.bugSeverity && <span><strong>Severity:</strong> {selectedTC.bugSeverity}</span>}
+                                                            {selectedTC.fixStatus && <span><strong>Fix Status:</strong> {selectedTC.fixStatus}</span>}
+                                                            {selectedTC.bugId && <span><strong>Bug ID:</strong> {selectedTC.bugId}</span>}
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        )}
 
                                         {/* Jira Ticket Section */}
                                         {selectedTC.executionStatus === 'Failed' && (
@@ -572,7 +698,7 @@ const TestPlans = () => {
                                                                     <td><StatusTag status={tc.executionStatus || 'Pending'} /></td>
                                                                     <td>
                                                                         <div style={{ display: 'flex', gap: 4 }}>
-                                                                            {['Pass', 'Failed', 'Pending'].map(s => (
+                                                                            {['Pass', 'Failed', 'Pending', 'N/A'].map(s => (
                                                                                 <button
                                                                                     key={s}
                                                                                     onClick={() => handleUpdateTCExecution(tc._id, s)}
@@ -606,7 +732,7 @@ const TestPlans = () => {
                                         {editingExec ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                                                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                                    {['Pending', 'Pass', 'Failed'].map(s => (
+                                                    {['Pending', 'Pass', 'Failed', 'N/A'].map(s => (
                                                         <button
                                                             key={s}
                                                             onClick={() => setExecStatus(s)}

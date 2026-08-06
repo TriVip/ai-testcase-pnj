@@ -23,17 +23,18 @@ const Dashboard = () => {
                 const pass = tcs.filter(t => t.executionStatus === 'Pass').length;
                 const failed = tcs.filter(t => t.executionStatus === 'Failed').length;
                 const pending = tcs.filter(t => t.executionStatus === 'Pending').length;
+                const na = tcs.filter(t => t.executionStatus === 'N/A').length;
                 const activePlans = plans.filter(p => p.status === 'In Progress' || p.status === 'Planning').length;
                 const passRate = tcs.length > 0 ? Math.round((pass / tcs.length) * 100) : 0;
 
-                setStats({ total: tcs.length, pass, failed, pending, passRate, activePlans, totalPlans: plans.length });
+                setStats({ total: tcs.length, pass, failed, pending, na, passRate, activePlans, totalPlans: plans.length });
                 // Recent: last 8 TCs sorted by updatedAt or createdAt
                 const sorted = [...tcs].sort((a, b) =>
                     new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)
                 );
                 setRecentTCs(sorted.slice(0, 8));
             } catch {
-                setStats({ total: 0, pass: 0, failed: 0, pending: 0, passRate: 0, activePlans: 0, totalPlans: 0 });
+                setStats({ total: 0, pass: 0, failed: 0, pending: 0, na: 0, passRate: 0, activePlans: 0, totalPlans: 0 });
             } finally {
                 setLoading(false);
             }
@@ -89,6 +90,7 @@ const Dashboard = () => {
                                     <span style={{ color: 'var(--status-fail-text)' }}>{stats.failed} fail</span>
                                     {' · '}
                                     <span>{stats.pending} pending</span>
+                                    {stats.na > 0 && <>{' · '}<span>{stats.na} n/a</span></>}
                                 </div>
                             </div>
 

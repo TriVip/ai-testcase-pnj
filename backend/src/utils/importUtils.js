@@ -91,15 +91,16 @@ const parseCSV = (buffer) => {
 };
 
 /**
- * Turn the Steps cell into the shape the TestCase model stores.
+ * Turn the Test steps cell into the shape the TestCase model stores.
  *
- * The model holds steps as subdocuments ({ stepNumber, action, expectedResult }),
- * but the import format carries them as text — either pipe-separated or a JSON
- * array — so they have to be converted. Previously this returned plain strings,
- * which Mongoose could not cast, and importing the template this app generates
- * failed with a CastError.
+ * The model holds steps as subdocuments ({ stepNumber, action, expectedResult}).
+ * The import format carries them as text, in any of three shapes:
+ *   - a JSON array (optionally of {action, expectedResult} objects)
+ *   - numbered, one-per-line text ("1. Do X\n2. Do Y") — the template's own
+ *     format, matching how most hand-written test steps are already written
+ *   - a pipe-separated single line ("Do X | Do Y"), kept for compactness
  *
- * The sheet has one "Expected Result" column for the whole row rather than one
+ * The sheet has one "Expect results" column for the whole row rather than one
  * per step, so that value is attached to the final step, which is where the
  * overall outcome belongs.
  */
@@ -111,7 +112,14 @@ const parseSteps = (rawValue, rowExpectedResult) => {
             const fromJSON = JSON.parse(rawValue);
             parts = Array.isArray(fromJSON) ? fromJSON : [rawValue];
         } catch {
-            parts = rawValue.split('|').map(s => s.trim()).filter(Boolean);
+            if (rawValue.includes('\n')) {
+                parts = rawValue
+                    .split('\n')
+                    .map(line => line.replace(/^\s*\d+[.)]\s*/, '').trim())
+                    .filter(Boolean);
+            } else {
+                parts = rawValue.split('|').map(s => s.trim()).filter(Boolean);
+            }
         }
     } else if (Array.isArray(rawValue)) {
         parts = rawValue;
@@ -140,20 +148,69 @@ const parseSteps = (rawValue, rowExpectedResult) => {
     return steps;
 };
 
+// Maps the execution-status values the template's dropdown offers (and their
+// case-insensitive variants) onto the model's own enum. UNTESTED has no
+// literal equivalent in the model — it means "not run yet", the same as the
+// model's default, so it maps to Pending.
+const normalizeExecutionStatus = (raw) => {
+    const trimmed = (raw ?? '').toString().trim();
+    if (!trimmed) return 'Pending';
+
+    switch (trimmed.toUpperCase()) {
+        case 'UNTESTED':
+        case 'PENDING':
+            return 'Pending';
+        case 'PASS':
+            return 'Pass';
+        case 'FAIL':
+        case 'FAILED':
+            return 'Failed';
+        case 'N/A':
+        case 'NA':
+            return 'N/A';
+        default:
+            // Fall through unrecognized as-is so validateTestCase reports it
+            // clearly, rather than silently coercing to a default here.
+            return trimmed;
+    }
+};
+
 /**
- * Transform a row from import file to test case object
+ * Transform a row from import file to test case object.
+ *
+ * Column names match the current template (ID, Feature, Descriptions,
+ * Pre-condition, Test steps, Test data, Expect results, Trạng thái, Phân loại
+ * lỗi, Mức độ lỗi, Trạng thái fix, Actual results / Ghi chú, Bug ID). The
+ * app's older column names (Title, Description, Steps, Expected Result,
+ * Execution Status, Execution Notes) are still accepted as fallbacks, so a
+ * file exported from an earlier version of the template still imports.
  */
 const transformRowToTestCase = (row) => {
-    const expectedResult = row['Expected Result'] || row.expectedResult || row['Expected_Result'] || '';
+    const expectedResult = row['Expect results'] || row['Expected Result'] || row.expectedResult || '';
+
+    // The template has one "Descriptions" column, not separate Title and
+    // Description fields — the model requires both non-empty, so the same
+    // text is used for each rather than inventing a shorter title.
+    const descriptions = row['Descriptions'] || row.Description || row.description || row.Title || row.title || '';
 
     return {
-        title: row.Title || row.title || '',
-        description: row.Description || row.description || '',
-        category: row.Category || row.category || '',
-        priority: row.Priority || row.priority || 'Medium',
-        steps: parseSteps(row.Steps ?? row.steps, expectedResult),
-        executionStatus: row['Execution Status'] || row.executionStatus || row['Execution_Status'] || 'Pending',
-        executionNotes: row['Execution Notes'] || row.executionNotes || row['Execution_Notes'] || '',
+        externalId: row['ID'] || row.externalId || '',
+        title: descriptions,
+        description: descriptions,
+        feature: row['Feature'] || row.feature || 'General',
+        category: row['Category'] || row.category || 'General',
+        preCondition: row['Pre-condition'] || row.preCondition || '',
+        testData: row['Test data'] || row.testData || '',
+        priority: row['Priority'] || row.priority || 'Medium',
+        steps: parseSteps(row['Test steps'] ?? row.Steps ?? row.steps, expectedResult),
+        executionStatus: normalizeExecutionStatus(
+            row['Trạng thái'] || row['Execution Status'] || row.executionStatus
+        ),
+        executionNotes: row['Actual results / Ghi chú'] || row['Execution Notes'] || row.executionNotes || '',
+        bugType: row['Phân loại lỗi'] || row.bugType || undefined,
+        bugSeverity: row['Mức độ lỗi'] || row.bugSeverity || undefined,
+        fixStatus: row['Trạng thái fix'] || row.fixStatus || undefined,
+        bugId: row['Bug ID'] || row.bugId || '',
     };
 };
 
@@ -163,32 +220,40 @@ const transformRowToTestCase = (row) => {
 const validateTestCase = (testCase, rowIndex) => {
     const errors = [];
 
-    // Required fields
+    // Required fields. Category is not — the template doesn't collect it and
+    // the model already defaults it to 'General', so requiring it here would
+    // reject every row the current template produces.
     if (!testCase.title || testCase.title.trim() === '') {
-        errors.push(`Row ${rowIndex + 2}: Title is required`);
+        errors.push(`Row ${rowIndex + 2}: Title/Descriptions is required`);
     }
     if (!testCase.description || testCase.description.trim() === '') {
         errors.push(`Row ${rowIndex + 2}: Description is required`);
     }
-    if (!testCase.category || testCase.category.trim() === '') {
-        errors.push(`Row ${rowIndex + 2}: Category is required`);
-    }
 
-    // Priority validation
     const validPriorities = ['Critical', 'High', 'Medium', 'Low'];
     if (!validPriorities.includes(testCase.priority)) {
         errors.push(`Row ${rowIndex + 2}: Priority must be one of: ${validPriorities.join(', ')}`);
     }
 
-    // Execution Status validation
-    const validStatuses = ['Pending', 'Pass', 'Failed'];
+    const validStatuses = ['Pending', 'Pass', 'Failed', 'N/A'];
     if (!validStatuses.includes(testCase.executionStatus)) {
-        errors.push(`Row ${rowIndex + 2}: Execution Status must be one of: ${validStatuses.join(', ')}`);
+        errors.push(`Row ${rowIndex + 2}: Trạng thái must be one of: PASS, FAIL, UNTESTED, N/A`);
     }
 
-    // Steps validation
+    // Bug-tracking fields are optional — only validated when present, since a
+    // row with no bug logged yet leaves them blank.
+    if (testCase.bugType && !['Bug', 'Đề xuất'].includes(testCase.bugType)) {
+        errors.push(`Row ${rowIndex + 2}: Phân loại lỗi must be one of: Bug, Đề xuất`);
+    }
+    if (testCase.bugSeverity && !['High', 'Medium', 'Low'].includes(testCase.bugSeverity)) {
+        errors.push(`Row ${rowIndex + 2}: Mức độ lỗi must be one of: High, Medium, Low`);
+    }
+    if (testCase.fixStatus && !['Đã fix', 'Chưa fix', 'Không fix'].includes(testCase.fixStatus)) {
+        errors.push(`Row ${rowIndex + 2}: Trạng thái fix must be one of: Đã fix, Chưa fix, Không fix`);
+    }
+
     if (!Array.isArray(testCase.steps)) {
-        errors.push(`Row ${rowIndex + 2}: Steps must be an array`);
+        errors.push(`Row ${rowIndex + 2}: Test steps must be an array`);
     }
 
     return errors;

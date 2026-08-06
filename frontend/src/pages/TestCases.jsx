@@ -307,6 +307,7 @@ const TestCases = () => {
                             <option value="Pass">Pass</option>
                             <option value="Failed">Failed</option>
                             <option value="Pending">Pending</option>
+                            <option value="N/A">N/A</option>
                         </select>
                         <select
                             value={categoryFilter}
@@ -489,12 +490,29 @@ const TestCases = () => {
                                                 {expandedRow === tc._id && (
                                                     <tr key={`${tc._id}-detail`} className="row-detail">
                                                         <td colSpan={8}>
+                                                            {tc.externalId && (
+                                                                <div style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                                                                    ID: {tc.externalId}
+                                                                </div>
+                                                            )}
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
                                                                 <div>
                                                                     <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Description</div>
                                                                     <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                                                                         {tc.description || <em style={{ color: 'var(--text-tertiary)' }}>No description</em>}
                                                                     </p>
+                                                                    {tc.preCondition && (
+                                                                        <>
+                                                                            <div className="section-label" style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>Pre-condition</div>
+                                                                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{tc.preCondition}</p>
+                                                                        </>
+                                                                    )}
+                                                                    {tc.testData && (
+                                                                        <>
+                                                                            <div className="section-label" style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>Test Data</div>
+                                                                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{tc.testData}</p>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                                 {tc.steps?.length > 0 && (
                                                                     <div>
@@ -519,6 +537,17 @@ const TestCases = () => {
                                                                 <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--brand-light)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--brand)' }}>
                                                                     <span className="section-label">Execution Notes: </span>
                                                                     <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.executionNotes}</span>
+                                                                </div>
+                                                            )}
+                                                            {(tc.bugType || tc.bugSeverity || tc.fixStatus || tc.bugId) && (
+                                                                <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--status-fail-bg)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--status-fail)' }}>
+                                                                    <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Bug Details</div>
+                                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                                                                        {tc.bugType && <span><strong>Type:</strong> {tc.bugType}</span>}
+                                                                        {tc.bugSeverity && <span><strong>Severity:</strong> {tc.bugSeverity}</span>}
+                                                                        {tc.fixStatus && <span><strong>Fix Status:</strong> {tc.fixStatus}</span>}
+                                                                        {tc.bugId && <span><strong>Bug ID:</strong> {tc.bugId}</span>}
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                         </td>
