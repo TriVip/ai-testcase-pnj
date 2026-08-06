@@ -5,12 +5,19 @@ const TestCaseForm = ({ testCase, onClose }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
+        externalId: '',
+        preCondition: '',
+        testData: '',
         priority: 'Medium',
         status: 'Draft',
         category: 'General',
         feature: 'General',
         tags: [],
         steps: [{ stepNumber: 1, action: '', expectedResult: '' }],
+        bugType: '',
+        bugSeverity: '',
+        fixStatus: '',
+        bugId: '',
     });
     const [loading, setLoading] = useState(false);
     const [tagInput, setTagInput] = useState('');
@@ -21,12 +28,19 @@ const TestCaseForm = ({ testCase, onClose }) => {
             setFormData({
                 title: testCase.title || '',
                 description: testCase.description || '',
+                externalId: testCase.externalId || '',
+                preCondition: testCase.preCondition || '',
+                testData: testCase.testData || '',
                 priority: testCase.priority || 'Medium',
                 status: testCase.status || 'Draft',
                 category: testCase.category || 'General',
                 feature: testCase.feature || 'General',
                 tags: testCase.tags || [],
                 steps: testCase.steps?.length > 0 ? testCase.steps : [{ stepNumber: 1, action: '', expectedResult: '' }],
+                bugType: testCase.bugType || '',
+                bugSeverity: testCase.bugSeverity || '',
+                fixStatus: testCase.fixStatus || '',
+                bugId: testCase.bugId || '',
             });
         }
     }, [testCase]);
@@ -108,17 +122,29 @@ const TestCaseForm = ({ testCase, onClose }) => {
                     </div>
 
                     <div className="modal-body" ref={modalBodyRef} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                        {/* Title */}
-                        <div className="form-group">
-                            <label className="form-label">Title *</label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.title}
-                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                className="input-field"
-                                placeholder="Enter test case title"
-                            />
+                        {/* External ID, Title */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: 'var(--space-3)' }}>
+                            <div className="form-group">
+                                <label className="form-label">External ID</label>
+                                <input
+                                    type="text"
+                                    value={formData.externalId}
+                                    onChange={(e) => setFormData({ ...formData, externalId: e.target.value })}
+                                    className="input-field"
+                                    placeholder="e.g., TC-001"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Title *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                    className="input-field"
+                                    placeholder="Enter test case title"
+                                />
+                            </div>
                         </div>
 
                         {/* Description */}
@@ -132,6 +158,30 @@ const TestCaseForm = ({ testCase, onClose }) => {
                                 rows="3"
                                 placeholder="Describe what this test case validates"
                             />
+                        </div>
+
+                        {/* Pre-condition, Test data */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                            <div className="form-group">
+                                <label className="form-label">Pre-condition</label>
+                                <textarea
+                                    value={formData.preCondition}
+                                    onChange={(e) => setFormData({ ...formData, preCondition: e.target.value })}
+                                    className="input-field"
+                                    rows="2"
+                                    placeholder="State required before this test can run"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Test data</label>
+                                <textarea
+                                    value={formData.testData}
+                                    onChange={(e) => setFormData({ ...formData, testData: e.target.value })}
+                                    className="input-field"
+                                    rows="2"
+                                    placeholder="Specific values used to run this test"
+                                />
+                            </div>
                         </div>
 
                         {/* Priority, Status, Category */}
@@ -266,6 +316,64 @@ const TestCaseForm = ({ testCase, onClose }) => {
                                         />
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Bug Details — only relevant once execution has turned up a
+                            defect. Optional; every field can be left blank. */}
+                        <div style={{ background: 'var(--bg-surface-2)', borderRadius: 'var(--radius)', padding: 'var(--space-3)', border: '1px solid var(--border)' }}>
+                            <label className="form-label" style={{ marginBottom: 'var(--space-3)', display: 'block' }}>
+                                Bug Details <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(if this test case found a bug)</span>
+                            </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Bug Type</label>
+                                    <select
+                                        value={formData.bugType}
+                                        onChange={(e) => setFormData({ ...formData, bugType: e.target.value })}
+                                        className="input-field"
+                                    >
+                                        <option value="">—</option>
+                                        <option value="Bug">Bug</option>
+                                        <option value="Đề xuất">Đề xuất</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Severity</label>
+                                    <select
+                                        value={formData.bugSeverity}
+                                        onChange={(e) => setFormData({ ...formData, bugSeverity: e.target.value })}
+                                        className="input-field"
+                                    >
+                                        <option value="">—</option>
+                                        <option value="High">High</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Fix Status</label>
+                                    <select
+                                        value={formData.fixStatus}
+                                        onChange={(e) => setFormData({ ...formData, fixStatus: e.target.value })}
+                                        className="input-field"
+                                    >
+                                        <option value="">—</option>
+                                        <option value="Đã fix">Đã fix</option>
+                                        <option value="Chưa fix">Chưa fix</option>
+                                        <option value="Không fix">Không fix</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Bug ID</label>
+                                <input
+                                    type="text"
+                                    value={formData.bugId}
+                                    onChange={(e) => setFormData({ ...formData, bugId: e.target.value })}
+                                    className="input-field"
+                                    placeholder="e.g., BUG-101"
+                                />
                             </div>
                         </div>
                     </div>

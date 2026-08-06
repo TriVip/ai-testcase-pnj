@@ -9,6 +9,7 @@ const STATUS_MAP = {
     Pass: 'status-tag status-pass',
     Failed: 'status-tag status-failed',
     Pending: 'status-tag status-pending',
+    'N/A': 'status-tag status-pending',
     Blocked: 'status-tag status-blocked',
     Warning: 'status-tag status-warn',
 
