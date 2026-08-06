@@ -8,7 +8,14 @@ services:
     environment:
       - PORT=${PORT:-9999}
       - MONGODB_URI=${MONGODB_URI}
-      - FRONTEND_URL=${FRONTEND_URL:-https://rekcal.kinavity.com}
+      # No default on purpose. This value is the allowed CORS origin and the
+      # Socket.io origin, so a stale one is not a cosmetic problem: it used to
+      # default to a specific domain, and once that registration lapsed the
+      # fallback pointed at a name anyone could claim — which would hand that
+      # origin CORS approval with credentials: true, on a SameSite=None cookie.
+      # `:?` makes compose refuse to start when it is unset, rather than
+      # silently trusting somebody else's domain.
+      - FRONTEND_URL=${FRONTEND_URL:?set FRONTEND_URL to the origin serving the frontend}
       - NODE_ENV=${NODE_ENV:-development}
     env_file:
       - .env
