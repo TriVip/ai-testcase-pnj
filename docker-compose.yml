@@ -16,8 +16,16 @@ services:
   frontend:
     build:
       context: ./frontend
+    # nginx resolves proxy_pass upstreams when it loads its config and exits if
+    # the name does not resolve, so it must not start before the backend
+    # container exists on the network. Without this the frontend loses the race
+    # on a cold `up` and dies with "host not found in upstream".
+    depends_on:
+      - backend
+    # The container listens on 8080, not 80 — nginx runs unprivileged there and
+    # cannot bind a port below 1024. The published port is unchanged.
     ports:
-      - "8080:80"
+      - "8080:8080"
 
 volumes:
   mongodb_data:
