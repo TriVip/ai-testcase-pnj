@@ -46,6 +46,15 @@ const testPlanSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Workspace',
         },
+        // Who last changed the plan's own executionStatus, and when.
+        // Server-set only — see the matching note in models/TestCase.js.
+        executedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        executedAt: {
+            type: Date,
+        },
     },
     {
         timestamps: true,

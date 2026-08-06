@@ -3,6 +3,15 @@ import TestPlan from '../models/TestPlan.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimit.js';
 import { buildScopeQuery, resolveWorkspaceForWrite } from '../utils/workspaceAccess.js';
+import { logActivity } from '../utils/activityLog.js';
+import ActivityLog from '../models/ActivityLog.js';
+
+// Nested populate so each test case in a plan carries its own executor info,
+// same shape as the standalone /api/testcases endpoints.
+const populateTestCasesWithExecutor = {
+    path: 'testCases',
+    populate: { path: 'executedBy', select: 'name email picture' },
+};
 
 // Rate limiter: max 10 delete operations per 10 seconds per user
 const deleteLimiter = createRateLimiter({ windowMs: 10_000, max: 10 });
@@ -43,7 +52,8 @@ router.get('/', async (req, res, next) => {
         const query = await buildScopeQuery(req);
 
         const testPlans = await TestPlan.find(query)
-            .populate('testCases')
+            .populate(populateTestCasesWithExecutor)
+            .populate('executedBy', 'name email picture')
             .sort({ createdAt: -1 });
         res.json(testPlans);
     } catch (error) {
@@ -57,15 +67,37 @@ router.get('/:id', async (req, res, next) => {
     try {
         const query = await buildScopeQuery(req, { _id: req.params.id });
 
-        const testPlan = await TestPlan.findOne(query).populate(
-            'testCases'
-        );
+        const testPlan = await TestPlan.findOne(query)
+            .populate(populateTestCasesWithExecutor)
+            .populate('executedBy', 'name email picture');
 
         if (!testPlan) {
             return res.status(404).json({ message: 'Test plan not found' });
         }
 
         res.json(testPlan);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @route   GET /api/testplans/:id/history
+// @desc    Get activity history for a test plan (execution changes, edits, membership changes)
+router.get('/:id/history', async (req, res, next) => {
+    try {
+        const query = await buildScopeQuery(req, { _id: req.params.id });
+
+        const exists = await TestPlan.exists(query);
+        if (!exists) {
+            return res.status(404).json({ message: 'Test plan not found' });
+        }
+
+        const history = await ActivityLog.find({ entityType: 'TestPlan', entityId: req.params.id })
+            .populate('user', 'name email picture')
+            .sort({ createdAt: -1 })
+            .limit(100);
+
+        res.json(history);
     } catch (error) {
         next(error);
     }
@@ -82,6 +114,14 @@ router.post('/', async (req, res, next) => {
             ...(workspaceId && { workspace: workspaceId }),
         });
 
+        await logActivity({
+            entityType: 'TestPlan',
+            entityId: testPlan._id,
+            workspace: workspaceId || undefined,
+            user: req.userId,
+            action: 'created',
+        });
+
         res.status(201).json(testPlan);
     } catch (error) {
         next(error);
@@ -94,14 +134,50 @@ router.put('/:id', async (req, res, next) => {
     try {
         const query = await buildScopeQuery(req, { _id: req.params.id });
 
+        const payload = pickAllowedFields(req.body);
+        const statusChanged = Object.prototype.hasOwnProperty.call(payload, 'executionStatus');
+        if (statusChanged) {
+            payload.executedBy = req.userId;
+            payload.executedAt = new Date();
+        }
+
         const testPlan = await TestPlan.findOneAndUpdate(
             query,
-            pickAllowedFields(req.body),
+            payload,
             { new: true, runValidators: true }
-        ).populate('testCases');
+        )
+            .populate(populateTestCasesWithExecutor)
+            .populate('executedBy', 'name email picture');
 
         if (!testPlan) {
             return res.status(404).json({ message: 'Test plan not found' });
+        }
+
+        const workspaceId = req.headers['x-workspace-id'] || testPlan.workspace || undefined;
+
+        if (statusChanged) {
+            await logActivity({
+                entityType: 'TestPlan',
+                entityId: testPlan._id,
+                workspace: workspaceId,
+                user: req.userId,
+                action: 'execution_status_changed',
+                toStatus: testPlan.executionStatus,
+            });
+        }
+
+        const editedFields = Object.keys(payload).filter(
+            f => !['executionStatus', 'executionNotes', 'executedBy', 'executedAt'].includes(f)
+        );
+        if (editedFields.length > 0) {
+            await logActivity({
+                entityType: 'TestPlan',
+                entityId: testPlan._id,
+                workspace: workspaceId,
+                user: req.userId,
+                action: 'updated',
+                changedFields: editedFields,
+            });
         }
 
         res.json(testPlan);
@@ -144,9 +220,18 @@ router.post('/:id/testcases', async (req, res, next) => {
         if (!testPlan.testCases.includes(testCaseId)) {
             testPlan.testCases.push(testCaseId);
             await testPlan.save();
+
+            await logActivity({
+                entityType: 'TestPlan',
+                entityId: testPlan._id,
+                workspace: req.headers['x-workspace-id'] || testPlan.workspace || undefined,
+                user: req.userId,
+                action: 'updated',
+                changedFields: ['testCases'],
+            });
         }
 
-        await testPlan.populate('testCases');
+        await testPlan.populate(populateTestCasesWithExecutor);
         res.json(testPlan);
     } catch (error) {
         next(error);
@@ -175,7 +260,17 @@ router.delete('/:id/testcases/:testCaseId', async (req, res, next) => {
         }
 
         await testPlan.save();
-        await testPlan.populate('testCases');
+
+        await logActivity({
+            entityType: 'TestPlan',
+            entityId: testPlan._id,
+            workspace: req.headers['x-workspace-id'] || testPlan.workspace || undefined,
+            user: req.userId,
+            action: 'updated',
+            changedFields: ['testCases'],
+        });
+
+        await testPlan.populate(populateTestCasesWithExecutor);
 
         res.json(testPlan);
     } catch (error) {

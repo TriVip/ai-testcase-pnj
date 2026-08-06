@@ -95,6 +95,7 @@ export const testCasesAPI = {
             responseType: 'blob',
         });
     },
+    getHistory: (id) => api.get(`/testcases/${id}/history`),
 };
 
 // Test Plans API
@@ -106,6 +107,7 @@ export const testPlansAPI = {
     delete: (id) => api.delete(`/testplans/${id}`),
     addTestCase: (planId, testCaseId) => api.post(`/testplans/${planId}/testcases`, { testCaseId }),
     removeTestCase: (planId, testCaseId) => api.delete(`/testplans/${planId}/testcases/${testCaseId}`),
+    getHistory: (id) => api.get(`/testplans/${id}/history`),
 };
 
 // AI API

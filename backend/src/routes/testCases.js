@@ -7,6 +7,8 @@ import { createRateLimiter } from '../middleware/rateLimit.js';
 import { parseXLSX, parseCSV, validateImportData } from '../utils/importUtils.js';
 import { generateXLSXTemplate, generateCSVTemplate } from '../utils/templateGenerator.js';
 import { buildScopeQuery, resolveWorkspaceForWrite } from '../utils/workspaceAccess.js';
+import { logActivity } from '../utils/activityLog.js';
+import ActivityLog from '../models/ActivityLog.js';
 
 // Rate limiter: max 10 delete operations per 10 seconds per user
 const deleteLimiter = createRateLimiter({ windowMs: 10_000, max: 10, message: 'Too many delete requests. Please slow down.' });
@@ -79,7 +81,9 @@ router.get('/', async (req, res, next) => {
     try {
         const query = await buildScopeQuery(req);
 
-        const testCases = await TestCase.find(query).sort({ createdAt: -1 });
+        const testCases = await TestCase.find(query)
+            .populate('executedBy', 'name email picture')
+            .sort({ createdAt: -1 });
         res.json(testCases);
     } catch (error) {
         next(error);
@@ -214,13 +218,35 @@ router.get('/:id', async (req, res, next) => {
     try {
         const query = await buildScopeQuery(req, { _id: req.params.id });
 
-        const testCase = await TestCase.findOne(query);
+        const testCase = await TestCase.findOne(query).populate('executedBy', 'name email picture');
 
         if (!testCase) {
             return res.status(404).json({ message: 'Test case not found' });
         }
 
         res.json(testCase);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @route   GET /api/testcases/:id/history
+// @desc    Get activity history for a test case (who executed/edited it, and when)
+router.get('/:id/history', async (req, res, next) => {
+    try {
+        const query = await buildScopeQuery(req, { _id: req.params.id });
+
+        const exists = await TestCase.exists(query);
+        if (!exists) {
+            return res.status(404).json({ message: 'Test case not found' });
+        }
+
+        const history = await ActivityLog.find({ entityType: 'TestCase', entityId: req.params.id })
+            .populate('user', 'name email picture')
+            .sort({ createdAt: -1 })
+            .limit(100);
+
+        res.json(history);
     } catch (error) {
         next(error);
     }
@@ -237,6 +263,14 @@ router.post('/', async (req, res, next) => {
             ...(workspaceId && { workspace: workspaceId }),
         });
 
+        await logActivity({
+            entityType: 'TestCase',
+            entityId: testCase._id,
+            workspace: workspaceId || undefined,
+            user: req.userId,
+            action: 'created',
+        });
+
         res.status(201).json(testCase);
     } catch (error) {
         next(error);
@@ -249,18 +283,54 @@ router.put('/:id', async (req, res, next) => {
     try {
         const query = await buildScopeQuery(req, { _id: req.params.id });
 
+        const payload = pickAllowedFields(req.body);
+        const statusChanged = Object.prototype.hasOwnProperty.call(payload, 'executionStatus');
+        // Set from the server's own auth context, never from the client —
+        // same rule as `user`/`workspace` above, so this can't be forged.
+        if (statusChanged) {
+            payload.executedBy = req.userId;
+            payload.executedAt = new Date();
+        }
+
         const testCase = await TestCase.findOneAndUpdate(
             query,
-            pickAllowedFields(req.body),
+            payload,
             { new: true, runValidators: true }
-        );
+        ).populate('executedBy', 'name email picture');
 
         if (!testCase) {
             return res.status(404).json({ message: 'Test case not found' });
         }
 
+        const workspaceId = req.headers['x-workspace-id'] || testCase.workspace || undefined;
+
+        if (statusChanged) {
+            await logActivity({
+                entityType: 'TestCase',
+                entityId: testCase._id,
+                workspace: workspaceId,
+                user: req.userId,
+                action: 'execution_status_changed',
+                toStatus: testCase.executionStatus,
+            });
+        }
+
+        const editedFields = Object.keys(payload).filter(
+            f => !['executionStatus', 'executionNotes', 'executedBy', 'executedAt'].includes(f)
+        );
+        if (editedFields.length > 0) {
+            await logActivity({
+                entityType: 'TestCase',
+                entityId: testCase._id,
+                workspace: workspaceId,
+                user: req.userId,
+                action: 'updated',
+                changedFields: editedFields,
+            });
+        }
+
         // Emit real-time update if executionStatus was changed
-        if (req.body.executionStatus) {
+        if (statusChanged) {
             const affectedPlans = await TestPlan.find({ testCases: testCase._id });
             affectedPlans.forEach(plan => {
                 if (req.io) {
@@ -268,7 +338,9 @@ router.put('/:id', async (req, res, next) => {
                         planId: plan._id,
                         testCaseId: testCase._id,
                         status: testCase.executionStatus,
-                        updatedBy: req.userId
+                        updatedBy: req.userId,
+                        executedBy: testCase.executedBy,
+                        executedAt: testCase.executedAt,
                     });
                 }
             });
