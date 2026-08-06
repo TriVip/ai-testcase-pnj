@@ -6,7 +6,12 @@ import { exportTestCasesToXLSX } from '../utils/exportToXLSX';
 import TestCaseForm from '../components/TestCaseForm';
 import AISuggestionModal from '../components/AISuggestionModal';
 import ImportTestCaseModal from '../components/ImportTestCaseModal';
+import ActivityHistory from '../components/ActivityHistory';
 import { useToast, ToastContainer } from '../components/Toast';
+
+const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+}) : null;
 
 const ITEMS_PER_PAGE = 25;
 
@@ -43,6 +48,10 @@ const TestCases = () => {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [improvingId, setImprovingId] = useState(null);
     const [deleting, setDeleting] = useState(false);
+    // Bumped after an action writes a new activity-log entry for the
+    // expanded row, so its History section re-fetches without needing the
+    // row to collapse/re-expand.
+    const [historyRefresh, setHistoryRefresh] = useState(0);
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -150,6 +159,7 @@ const TestCases = () => {
             });
             toast.success(imp.improvements ? `Improved: ${imp.improvements}` : 'Test case improved!', 5000);
             fetchTestCases();
+            setHistoryRefresh(v => v + 1);
         } catch (err) {
             toast.error(err.response?.data?.error || 'AI improvement failed', 5000);
         } finally {
@@ -161,6 +171,7 @@ const TestCases = () => {
         setShowForm(false);
         setEditingTestCase(null);
         fetchTestCases();
+        setHistoryRefresh(v => v + 1);
     };
 
     // ---- Derived data ----
@@ -539,6 +550,12 @@ const TestCases = () => {
                                                                     <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.executionNotes}</span>
                                                                 </div>
                                                             )}
+                                                            {tc.executedBy && (
+                                                                <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                                                                    Executed by <strong style={{ color: 'var(--text-secondary)' }}>{tc.executedBy.name || tc.executedBy.email}</strong>
+                                                                    {tc.executedAt && ` on ${fmtDateTime(tc.executedAt)}`}
+                                                                </div>
+                                                            )}
                                                             {(tc.bugType || tc.bugSeverity || tc.fixStatus || tc.bugId) && (
                                                                 <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--status-fail-bg)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--status-fail)' }}>
                                                                     <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Bug Details</div>
@@ -550,6 +567,10 @@ const TestCases = () => {
                                                                     </div>
                                                                 </div>
                                                             )}
+                                                            <div style={{ marginTop: 'var(--space-4)' }}>
+                                                                <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>History</div>
+                                                                <ActivityHistory historyFn={testCasesAPI.getHistory} entityId={tc._id} refreshToken={historyRefresh} />
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 )}

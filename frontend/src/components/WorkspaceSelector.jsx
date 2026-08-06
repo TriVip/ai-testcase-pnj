@@ -25,6 +25,47 @@ const IconUsers = () => (
     </svg>
 );
 
+// Static (non-live) list of who's in the active workspace. `members` already
+// arrives fully populated with name/email/picture from GET /api/workspaces —
+// this only renders what's already in memory, no extra request.
+const MemberList = ({ workspace }) => {
+    const members = workspace?.members || [];
+    if (members.length === 0) return null;
+    const ownerId = workspace.createdBy?._id || workspace.createdBy;
+
+    return (
+        <div style={{ marginTop: 12 }}>
+            <div style={{
+                fontSize: 10, fontWeight: 600, color: 'var(--text-on-sidebar-active)', opacity: 0.6,
+                textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, padding: '0 2px',
+            }}>
+                Members ({members.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 160, overflowY: 'auto' }}>
+                {members.map(m => (
+                    <div key={m._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 2px' }}>
+                        <div style={{
+                            width: 20, height: 20, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                            background: 'var(--brand)', color: '#fff', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', fontSize: 10, fontWeight: 600,
+                        }}>
+                            {m.picture
+                                ? <img src={m.picture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : (m.name || m.email || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <span className="truncate" style={{ fontSize: 12, color: 'var(--text-on-sidebar-active)' }} title={m.email}>
+                            {m.name || m.email}
+                        </span>
+                        {m._id === ownerId && (
+                            <span style={{ fontSize: 10, color: 'var(--text-on-sidebar-active)', opacity: 0.55, flexShrink: 0 }}>owner</span>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const WorkspaceSelector = () => {
     const {
         workspaces,
@@ -206,6 +247,8 @@ const WorkspaceSelector = () => {
                     <IconUsers /> Invite Team Members
                 </button>
             )}
+
+            <MemberList workspace={activeWorkspace} />
 
             {/* Create Workspace Modal */}
             {

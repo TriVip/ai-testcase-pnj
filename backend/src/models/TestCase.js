@@ -102,6 +102,16 @@ const testCaseSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Workspace',
         },
+        // Who last changed executionStatus, and when. Server-set only (see
+        // ALLOWED_FIELDS in routes/testCases.js) so it can be trusted as an
+        // actual attribution rather than a client-supplied claim.
+        executedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        executedAt: {
+            type: Date,
+        },
     },
     {
         timestamps: true,

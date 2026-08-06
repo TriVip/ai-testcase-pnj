@@ -5,6 +5,7 @@ import { testPlansAPI, testCasesAPI, jiraAPI } from '../services/api';
 import socket from '../services/socket';
 import { exportTestPlanToXLSX } from '../utils/exportToXLSX';
 import TestPlanForm from '../components/TestPlanForm';
+import ActivityHistory from '../components/ActivityHistory';
 
 // Inline chevron icons
 const ChevronDown = () => (
@@ -66,6 +67,10 @@ const TestPlans = () => {
     const [editingBug, setEditingBug] = useState(false);
     const [bugForm, setBugForm] = useState({ bugType: '', bugSeverity: '', fixStatus: '', bugId: '' });
     const [savingBug, setSavingBug] = useState(false);
+    // Bumped after any action that writes a new activity-log entry for the
+    // currently open TC/plan, so the History section re-fetches even though
+    // entityId itself didn't change.
+    const [historyRefresh, setHistoryRefresh] = useState(0);
 
     useEffect(() => {
         fetchTestPlans();
@@ -84,7 +89,10 @@ const TestPlans = () => {
         socket.emit('joinRoom', selectedPlan._id);
 
         const handleTestCaseUpdate = (data) => {
-            const { planId, testCaseId, status } = data;
+            const { planId, testCaseId, status, executedBy, executedAt } = data;
+            // Also carries executedBy/executedAt so a teammate watching the
+            // same plan sees who executed it without needing to refetch.
+            const patch = { executionStatus: status, executedBy, executedAt };
 
             // Only update if it's for the currently selected plan
             if (planId === selectedPlan._id) {
@@ -94,7 +102,7 @@ const TestPlans = () => {
 
                     const updatedTestCases = prevPlan.testCases.map(tc => {
                         if (tc._id === testCaseId) {
-                            return { ...tc, executionStatus: status };
+                            return { ...tc, ...patch };
                         }
                         return tc;
                     });
@@ -105,7 +113,7 @@ const TestPlans = () => {
                 // Set selected TC status if it's currently open
                 setSelectedTC((prevTc) => {
                     if (prevTc && prevTc._id === testCaseId) {
-                        return { ...prevTc, executionStatus: status };
+                        return { ...prevTc, ...patch };
                     }
                     return prevTc;
                 });
@@ -113,11 +121,15 @@ const TestPlans = () => {
                 // Update the stats in the testPlans list array subtly
                 setTestPlans((prevList) => prevList.map(p => {
                     if (p._id === planId) {
-                        const updatedTcs = p.testCases.map(tc => tc._id === testCaseId ? { ...tc, executionStatus: status } : tc);
+                        const updatedTcs = p.testCases.map(tc => tc._id === testCaseId ? { ...tc, ...patch } : tc);
                         return { ...p, testCases: updatedTcs };
                     }
                     return p;
                 }));
+
+                // A teammate's change also wrote a new activity-log entry —
+                // refresh the History panel if it's open on this TC.
+                setHistoryRefresh(v => v + 1);
             }
         };
 
@@ -171,15 +183,20 @@ const TestPlans = () => {
             const freshRes = await testPlansAPI.getAll();
             const fresh = freshRes.data.find(p => p._id === selectedPlan._id);
             if (fresh) setSelectedPlan(fresh);
+            setHistoryRefresh(v => v + 1);
         } catch { alert('Failed to update'); }
     };
 
     const handleUpdateTCExecution = async (tcId, status) => {
         try {
-            await testCasesAPI.update(tcId, { executionStatus: status });
+            const res = await testCasesAPI.update(tcId, { executionStatus: status });
             fetchTestPlans();
             if (selectedTC?._id === tcId) {
-                setSelectedTC(prev => ({ ...prev, executionStatus: status }));
+                // Merge the full response (not just executionStatus) so
+                // executedBy/executedAt — set server-side on this same
+                // request — show up immediately instead of only after the
+                // next full refetch.
+                setSelectedTC(prev => ({ ...prev, ...res.data }));
             }
             // Refresh selected plan
             if (selectedPlan) {
@@ -187,6 +204,7 @@ const TestPlans = () => {
                 const updated = res.data.find(p => p._id === selectedPlan._id);
                 if (updated) setSelectedPlan(updated);
             }
+            setHistoryRefresh(v => v + 1);
         } catch { alert('Failed to update test case execution'); }
     };
 
@@ -198,6 +216,7 @@ const TestPlans = () => {
             setSelectedTC(prev => ({ ...prev, ...bugForm }));
             setEditingBug(false);
             fetchTestPlans();
+            setHistoryRefresh(v => v + 1);
         } catch {
             alert('Failed to save bug details');
         } finally {
@@ -253,6 +272,7 @@ const TestPlans = () => {
     }, [selectedTC?._id]);
 
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+    const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
 
     if (loading) {
         return (
@@ -420,6 +440,12 @@ const TestPlans = () => {
                                                 <StatusTag status={selectedTC.executionStatus || 'Pending'} />
                                                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{selectedTC.category}</span>
                                             </div>
+                                            {selectedTC.executedBy && (
+                                                <div style={{ marginTop: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                                                    Executed by <strong style={{ color: 'var(--text-secondary)' }}>{selectedTC.executedBy.name || selectedTC.executedBy.email}</strong>
+                                                    {selectedTC.executedAt && ` on ${fmtDateTime(selectedTC.executedAt)}`}
+                                                </div>
+                                            )}
                                         </div>
                                         <button onClick={() => setSelectedTC(null)} className="btn btn-ghost btn-icon">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -589,6 +615,10 @@ const TestPlans = () => {
                                                 )}
                                             </div>
                                         )}
+
+                                        <div className="divider" style={{ margin: 'var(--space-5) 0' }} />
+                                        <div className="section-label" style={{ marginBottom: 'var(--space-3)' }}>History</div>
+                                        <ActivityHistory historyFn={testCasesAPI.getHistory} entityId={selectedTC._id} refreshToken={historyRefresh} />
                                     </div>
                                 </div>
                             ) : selectedPlan ? (
@@ -770,6 +800,12 @@ const TestPlans = () => {
                                                         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{selectedPlan.executionNotes}</p>
                                                     </div>
                                                 )}
+                                                {selectedPlan.executedBy && (
+                                                    <div style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                                                        Executed by <strong style={{ color: 'var(--text-secondary)' }}>{selectedPlan.executedBy.name || selectedPlan.executedBy.email}</strong>
+                                                        {selectedPlan.executedAt && ` on ${fmtDateTime(selectedPlan.executedAt)}`}
+                                                    </div>
+                                                )}
                                                 <button
                                                     onClick={() => { setEditingExec(true); setExecStatus(selectedPlan.executionStatus || 'Pending'); setExecNotes(selectedPlan.executionNotes || ''); }}
                                                     className="btn btn-secondary btn-sm"
@@ -778,6 +814,10 @@ const TestPlans = () => {
                                                 </button>
                                             </div>
                                         )}
+
+                                        <div className="divider" style={{ margin: 'var(--space-5) 0' }} />
+                                        <div className="section-label" style={{ marginBottom: 'var(--space-3)' }}>History</div>
+                                        <ActivityHistory historyFn={testPlansAPI.getHistory} entityId={selectedPlan._id} refreshToken={historyRefresh} />
                                     </div>
                                 </div>
                             ) : (
