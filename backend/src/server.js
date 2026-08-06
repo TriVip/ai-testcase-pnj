@@ -72,6 +72,18 @@ console.log('🔑 JWT_SECRET:', process.env.JWT_SECRET ? 'Found' : 'NOT FOUND');
 // up in shared aggregators and CI output.
 console.log('🔑 OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Found' : 'NOT FOUND');
 
+// Loud on purpose: this is a non-default, reduced-security mode (see the
+// COOKIE_SECURE comment in routes/auth.js). It should be visible in the
+// startup log, not something that's only discoverable by reading .env.
+if (process.env.COOKIE_SECURE === 'false') {
+    console.warn(
+        '⚠️  COOKIE_SECURE=false — session cookie is not marked Secure.\n' +
+        '   Only appropriate for a plain-HTTP deployment (e.g. testing against\n' +
+        '   an EC2 public IP with no TLS in front of it). Remove this variable\n' +
+        '   once the deployment is reachable over HTTPS.'
+    );
+}
+
 // Initialize Express app
 const app = express();
 const httpServer = createServer(app);
