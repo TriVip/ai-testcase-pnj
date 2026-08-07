@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import TestCases from './pages/TestCases';
 import TestPlans from './pages/TestPlans';
+import BugTracking from './pages/BugTracking';
 import Automation from './pages/Automation';
 
 const PrivateRoute = ({ children }) => {
@@ -52,6 +53,14 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <TestPlans />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/bugtracking"
+                            element={
+                                <PrivateRoute>
+                                    <BugTracking />
                                 </PrivateRoute>
                             }
                         />

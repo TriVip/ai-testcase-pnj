@@ -141,6 +141,8 @@ export const workspacesAPI = {
     getAll: () => api.get('/workspaces'),
     create: (data) => api.post('/workspaces', data),
     invite: (id, email) => api.post(`/workspaces/${id}/invite`, { email }),
+    removeMember: (id, userId) => api.delete(`/workspaces/${id}/members/${userId}`),
+    leave: (id) => api.post(`/workspaces/${id}/leave`),
 };
 
 export default api;

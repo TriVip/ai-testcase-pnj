@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import StatusTag from '../components/StatusTag';
 import { testPlansAPI, testCasesAPI, jiraAPI } from '../services/api';
@@ -72,6 +73,9 @@ const TestPlans = () => {
     // entityId itself didn't change.
     const [historyRefresh, setHistoryRefresh] = useState(0);
 
+    const location = useLocation();
+    const navigate = useNavigate();
+
     useEffect(() => {
         fetchTestPlans();
 
@@ -80,6 +84,36 @@ const TestPlans = () => {
             socket.disconnect();
         };
     }, []);
+
+    // Deep-select a plan (and optionally a test case within it), arriving
+    // via router state from another page — e.g. Test Cases' "In Test Plans"
+    // links or the Bug Tracking page. Waits for testPlans to be loaded, then
+    // clears the state via a replace-navigation so it doesn't re-fire on a
+    // later re-render or re-trigger if the user navigates back to this page.
+    useEffect(() => {
+        const { selectPlanId, selectTCId } = location.state || {};
+        if (!selectPlanId || testPlans.length === 0) return;
+
+        const plan = testPlans.find(p => p._id === selectPlanId);
+        if (!plan) {
+            navigate(location.pathname, { replace: true, state: null });
+            return;
+        }
+
+        setExpandedPlans(prev => new Set(prev).add(plan._id));
+
+        const tc = selectTCId ? plan.testCases.find(t => t._id === selectTCId) : null;
+        if (tc) {
+            setExpandedFeatures(prev => new Set(prev).add(`${plan._id}|${tc.feature || 'General'}`));
+            setSelectedTC(tc);
+            setSelectedPlan(null);
+        } else {
+            setSelectedPlan(plan);
+            setSelectedTC(null);
+        }
+
+        navigate(location.pathname, { replace: true, state: null });
+    }, [testPlans, location.state]);
 
     // Socket.io real-time updates for Test Plan
     useEffect(() => {

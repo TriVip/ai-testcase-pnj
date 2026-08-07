@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useWorkspace } from '../contexts/WorkspaceContext';
+import { useAuth } from '../contexts/AuthContext';
 import { workspacesAPI } from '../services/api';
 
 const IconChevronDown = () => (
@@ -25,13 +26,22 @@ const IconUsers = () => (
     </svg>
 );
 
+const IconX = () => (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+);
+
 // Static (non-live) list of who's in the active workspace. `members` already
 // arrives fully populated with name/email/picture from GET /api/workspaces —
-// this only renders what's already in memory, no extra request.
-const MemberList = ({ workspace }) => {
+// this only renders what's already in memory, no extra request. The owner
+// gets a remove button on every other row; nobody gets one on the owner's
+// own row — that requires the separate "leave" flow instead.
+const MemberList = ({ workspace, currentUserId, onRemoveMember }) => {
     const members = workspace?.members || [];
     if (members.length === 0) return null;
     const ownerId = workspace.createdBy?._id || workspace.createdBy;
+    const isOwner = currentUserId === ownerId;
 
     return (
         <div style={{ marginTop: 12 }}>
@@ -53,11 +63,24 @@ const MemberList = ({ workspace }) => {
                                 ? <img src={m.picture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 : (m.name || m.email || '?').charAt(0).toUpperCase()}
                         </div>
-                        <span className="truncate" style={{ fontSize: 12, color: 'var(--text-on-sidebar-active)' }} title={m.email}>
+                        <span className="truncate" style={{ fontSize: 12, color: 'var(--text-on-sidebar-active)', flex: 1 }} title={m.email}>
                             {m.name || m.email}
                         </span>
-                        {m._id === ownerId && (
+                        {m._id === ownerId ? (
                             <span style={{ fontSize: 10, color: 'var(--text-on-sidebar-active)', opacity: 0.55, flexShrink: 0 }}>owner</span>
+                        ) : isOwner && (
+                            <button
+                                onClick={() => onRemoveMember(m)}
+                                title={`Remove ${m.name || m.email}`}
+                                style={{
+                                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                                    lineHeight: 0, color: 'var(--text-on-sidebar-active)', opacity: 0.5, flexShrink: 0,
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                                onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
+                            >
+                                <IconX />
+                            </button>
                         )}
                     </div>
                 ))}
@@ -75,6 +98,7 @@ const WorkspaceSelector = () => {
         accessDeniedNotice,
         dismissAccessDeniedNotice,
     } = useWorkspace();
+    const { user } = useAuth();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -82,6 +106,28 @@ const WorkspaceSelector = () => {
     const [inviteEmail, setInviteEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    const isOwner = activeWorkspace && user && (activeWorkspace.createdBy?._id || activeWorkspace.createdBy) === user._id;
+
+    const handleRemoveMember = async (member) => {
+        if (!confirm(`Remove ${member.name || member.email} from ${activeWorkspace.name}?`)) return;
+        try {
+            await workspacesAPI.removeMember(activeWorkspace._id, member._id);
+            await fetchWorkspaces();
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to remove member');
+        }
+    };
+
+    const handleLeaveWorkspace = async () => {
+        if (!confirm(`Leave ${activeWorkspace.name}? You'll lose access to its test cases and test plans.`)) return;
+        try {
+            await workspacesAPI.leave(activeWorkspace._id);
+            await fetchWorkspaces();
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to leave workspace');
+        }
+    };
 
     const handleCreateWorkspace = async (e) => {
         e.preventDefault();
@@ -248,7 +294,26 @@ const WorkspaceSelector = () => {
                 </button>
             )}
 
-            <MemberList workspace={activeWorkspace} />
+            {activeWorkspace && !activeWorkspace.isPersonal && !isOwner && (
+                <button
+                    onClick={handleLeaveWorkspace}
+                    style={{
+                        display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        padding: '6px 12px', marginTop: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 'var(--radius)', color: 'var(--text-on-sidebar-active)', cursor: 'pointer',
+                        fontSize: '11px', fontWeight: 600, transition: 'var(--transition)'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                    title="Leave this workspace"
+                >
+                    Leave Workspace
+                </button>
+            )}
+
+            <MemberList workspace={activeWorkspace} currentUserId={user?._id} onRemoveMember={handleRemoveMember} />
 
             {/* Create Workspace Modal */}
             {

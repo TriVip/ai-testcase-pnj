@@ -29,6 +29,13 @@ const IconAutomation = () => (
     </svg>
 );
 
+const IconBug = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="8" y="6" width="8" height="12" rx="4" />
+        <path d="M12 6V4M8 9H4M8 14H4M16 9h4M16 14h4M9 3l1.5 2M15 3l-1.5 2M9 21l1.5-2M15 21l-1.5-2" />
+    </svg>
+);
+
 const IconLogout = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
@@ -62,6 +69,7 @@ const NAV_ITEMS = [
     { to: '/dashboard', label: 'Dashboard', icon: <IconDashboard /> },
     { to: '/testcases', label: 'Test Cases', icon: <IconTestCases /> },
     { to: '/testplans', label: 'Test Plans', icon: <IconTestPlans /> },
+    { to: '/bugtracking', label: 'Bug Tracking', icon: <IconBug /> },
     { to: '/automation', label: 'Automation Testing', icon: <IconAutomation /> },
 ];
 
@@ -83,7 +91,8 @@ const Sidebar = () => {
             if (e.key === '1') { e.preventDefault(); navigate('/dashboard'); }
             if (e.key === '2') { e.preventDefault(); navigate('/testcases'); }
             if (e.key === '3') { e.preventDefault(); navigate('/testplans'); }
-            if (e.key === '4') { e.preventDefault(); navigate('/automation'); }
+            if (e.key === '4') { e.preventDefault(); navigate('/bugtracking'); }
+            if (e.key === '5') { e.preventDefault(); navigate('/automation'); }
         };
         window.addEventListener('keydown', handleKey);
         return () => window.removeEventListener('keydown', handleKey);
