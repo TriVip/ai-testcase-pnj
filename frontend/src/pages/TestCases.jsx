@@ -1,13 +1,15 @@
-import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import StatusTag from '../components/StatusTag';
-import { testCasesAPI, aiAPI } from '../services/api';
+import { testCasesAPI, testPlansAPI, aiAPI } from '../services/api';
 import { exportTestCasesToXLSX } from '../utils/exportToXLSX';
 import TestCaseForm from '../components/TestCaseForm';
 import AISuggestionModal from '../components/AISuggestionModal';
 import ImportTestCaseModal from '../components/ImportTestCaseModal';
 import ActivityHistory from '../components/ActivityHistory';
 import { useToast, ToastContainer } from '../components/Toast';
+import { buildTcToPlansMap } from '../utils/testPlanLookup';
 
 const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-GB', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -39,6 +41,7 @@ const SortIcon = ({ dir }) => (
 
 const TestCases = () => {
     const [testCases, setTestCases] = useState([]);
+    const [testPlans, setTestPlans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [showAIModal, setShowAIModal] = useState(false);
@@ -58,6 +61,7 @@ const TestCases = () => {
     const [priorityFilter, setPriorityFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
     const [categoryFilter, setCategoryFilter] = useState('All');
+    const [planFilter, setPlanFilter] = useState('All');
 
     // Sort
     const [sortCol, setSortCol] = useState('');
@@ -68,6 +72,7 @@ const TestCases = () => {
 
     const searchRef = useRef(null);
     const toast = useToast();
+    const navigate = useNavigate();
 
     // "/" shortcut focuses search
     useEffect(() => {
@@ -81,7 +86,10 @@ const TestCases = () => {
         return () => window.removeEventListener('keydown', handler);
     }, []);
 
-    useEffect(() => { fetchTestCases(); }, []);
+    useEffect(() => {
+        fetchTestCases();
+        testPlansAPI.getAll().then(res => setTestPlans(res.data || [])).catch(() => setTestPlans([]));
+    }, []);
 
     const fetchTestCases = async () => {
         try {
@@ -94,6 +102,8 @@ const TestCases = () => {
             setLoading(false);
         }
     };
+
+    const tcToPlans = useMemo(() => buildTcToPlansMap(testPlans), [testPlans]);
 
     const handleDelete = async (id) => {
         if (!confirm('Delete this test case?')) return;
@@ -186,7 +196,8 @@ const TestCases = () => {
         const matchPriority = priorityFilter === 'All' || tc.priority === priorityFilter;
         const matchStatus = statusFilter === 'All' || tc.executionStatus === statusFilter;
         const matchCategory = categoryFilter === 'All' || tc.category === categoryFilter;
-        return matchSearch && matchPriority && matchStatus && matchCategory;
+        const matchPlan = planFilter === 'All' || (tcToPlans[tc._id] || []).some(p => p._id === planFilter);
+        return matchSearch && matchPriority && matchStatus && matchCategory && matchPlan;
     });
 
     const sorted = [...filtered].sort((a, b) => {
@@ -232,9 +243,10 @@ const TestCases = () => {
         setPriorityFilter('All');
         setStatusFilter('All');
         setCategoryFilter('All');
+        setPlanFilter('All');
         setPage(1);
     };
-    const hasFilters = searchTerm || priorityFilter !== 'All' || statusFilter !== 'All' || categoryFilter !== 'All';
+    const hasFilters = searchTerm || priorityFilter !== 'All' || statusFilter !== 'All' || categoryFilter !== 'All' || planFilter !== 'All';
 
     if (loading) {
         return (
@@ -327,6 +339,15 @@ const TestCases = () => {
                             style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
                         >
                             {categories.map(c => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
+                        </select>
+                        <select
+                            value={planFilter}
+                            onChange={e => { setPlanFilter(e.target.value); setPage(1); }}
+                            className="input-field filter-select"
+                            style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
+                        >
+                            <option value="All">All Test Plans</option>
+                            {testPlans.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                         </select>
                         {hasFilters && (
                             <button onClick={clearFilters} className="btn btn-ghost btn-sm" style={{ whiteSpace: 'nowrap' }}>
@@ -556,6 +577,29 @@ const TestCases = () => {
                                                                     {tc.executedAt && ` on ${fmtDateTime(tc.executedAt)}`}
                                                                 </div>
                                                             )}
+                                                            <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                                                                In Test Plans:{' '}
+                                                                {(tcToPlans[tc._id] || []).length === 0 ? (
+                                                                    <em>none</em>
+                                                                ) : (
+                                                                    (tcToPlans[tc._id] || []).map((plan, i) => (
+                                                                        <span key={plan._id}>
+                                                                            {i > 0 && ', '}
+                                                                            <a
+                                                                                href="#"
+                                                                                onClick={(e) => {
+                                                                                    e.preventDefault();
+                                                                                    e.stopPropagation();
+                                                                                    navigate('/testplans', { state: { selectPlanId: plan._id, selectTCId: tc._id } });
+                                                                                }}
+                                                                                style={{ color: 'var(--brand)' }}
+                                                                            >
+                                                                                {plan.name}
+                                                                            </a>
+                                                                        </span>
+                                                                    ))
+                                                                )}
+                                                            </div>
                                                             {(tc.bugType || tc.bugSeverity || tc.fixStatus || tc.bugId) && (
                                                                 <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--status-fail-bg)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--status-fail)' }}>
                                                                     <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Bug Details</div>
