@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { testCasesAPI } from '../services/api';
+import { useState, useEffect } from 'react';
+import { testCasesAPI, testPlansAPI } from '../services/api';
 import { useToast } from './Toast';
 
 const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
@@ -8,6 +8,19 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
     const [result, setResult] = useState(null);
     const [errors, setErrors] = useState([]);
     const toast = useToast();
+
+    // Optional: attach the imported test cases to a test plan, either an
+    // existing one or a brand-new one created on the fly.
+    const [planMode, setPlanMode] = useState('none'); // 'none' | 'existing' | 'new'
+    const [plans, setPlans] = useState([]);
+    const [selectedPlanId, setSelectedPlanId] = useState('');
+    const [newPlanName, setNewPlanName] = useState('');
+
+    useEffect(() => {
+        testPlansAPI.getAll()
+            .then(res => setPlans(res.data || []))
+            .catch(() => setPlans([]));
+    }, []);
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
@@ -50,13 +63,24 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
             toast.error('Please select a file to import');
             return;
         }
+        if (planMode === 'existing' && !selectedPlanId) {
+            toast.error('Please choose a test plan');
+            return;
+        }
+        if (planMode === 'new' && !newPlanName.trim()) {
+            toast.error('Please enter a name for the new test plan');
+            return;
+        }
 
         setUploading(true);
         setResult(null);
         setErrors([]);
 
         try {
-            const response = await testCasesAPI.importTestCases(file);
+            const opts = planMode === 'existing' ? { planId: selectedPlanId }
+                : planMode === 'new' ? { newPlanName: newPlanName.trim() }
+                : {};
+            const response = await testCasesAPI.importTestCases(file, opts);
             setResult({
                 success: true,
                 count: response.data.count,
@@ -196,6 +220,48 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
                                 )}
                             </label>
                         </div>
+                    </div>
+
+                    {/* Attach to Test Plan (optional) */}
+                    <div className="mb-6">
+                        <h3 className="font-semibold text-gray-900 mb-3">Add to Test Plan (optional)</h3>
+                        <div className="flex gap-2 mb-3">
+                            {[
+                                { value: 'none', label: 'None' },
+                                { value: 'existing', label: 'Existing plan' },
+                                { value: 'new', label: 'New plan' },
+                            ].map(opt => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setPlanMode(opt.value)}
+                                    className={`btn btn-sm ${planMode === opt.value ? 'btn-primary' : 'btn-secondary'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                        {planMode === 'existing' && (
+                            <select
+                                value={selectedPlanId}
+                                onChange={(e) => setSelectedPlanId(e.target.value)}
+                                className="input-field w-full"
+                            >
+                                <option value="">Select a test plan…</option>
+                                {plans.map(p => (
+                                    <option key={p._id} value={p._id}>{p.name}</option>
+                                ))}
+                            </select>
+                        )}
+                        {planMode === 'new' && (
+                            <input
+                                type="text"
+                                value={newPlanName}
+                                onChange={(e) => setNewPlanName(e.target.value)}
+                                placeholder="New test plan name"
+                                className="input-field w-full"
+                            />
+                        )}
                     </div>
 
                     {/* Import Result */}

@@ -9,6 +9,7 @@ import { generateXLSXTemplate, generateCSVTemplate } from '../utils/templateGene
 import { buildScopeQuery, resolveWorkspaceForWrite } from '../utils/workspaceAccess.js';
 import { logActivity } from '../utils/activityLog.js';
 import ActivityLog from '../models/ActivityLog.js';
+import { syncPlanStatusFromTestCases } from '../utils/planStatusSync.js';
 
 // Rate limiter: max 10 delete operations per 10 seconds per user
 const deleteLimiter = createRateLimiter({ windowMs: 10_000, max: 10, message: 'Too many delete requests. Please slow down.' });
@@ -115,7 +116,10 @@ router.get('/template', async (req, res, next) => {
 });
 
 // @route   POST /api/testcases/import
-// @desc    Import test cases from XLSX or CSV file
+// @desc    Import test cases from XLSX or CSV file, optionally attaching
+//          them to a test plan (existing, via `planId`, or a new one, via
+//          `newPlanName` — both arrive as multipart form fields alongside
+//          the file).
 router.post('/import', upload.single('file'), async (req, res, next) => {
     try {
         if (!req.file) {
@@ -147,6 +151,18 @@ router.post('/import', upload.single('file'), async (req, res, next) => {
             });
         }
 
+        // Resolve the target plan (if any) before writing anything, so a bad
+        // planId fails the request without leaving orphaned test cases.
+        const { planId, newPlanName } = req.body;
+        let existingPlan = null;
+        if (planId) {
+            const planQuery = await buildScopeQuery(req, { _id: planId });
+            existingPlan = await TestPlan.findOne(planQuery);
+            if (!existingPlan) {
+                return res.status(404).json({ message: 'Test plan not found' });
+            }
+        }
+
         // Add user ID and workspace ID to all test cases
         const workspaceId = await resolveWorkspaceForWrite(req);
         const testCasesWithUser = validation.validTestCases.map(tc => ({
@@ -158,10 +174,44 @@ router.post('/import', upload.single('file'), async (req, res, next) => {
         // Bulk insert
         const inserted = await TestCase.insertMany(testCasesWithUser);
 
+        let targetPlanId = null;
+        if (existingPlan) {
+            existingPlan.testCases.push(...inserted.map(tc => tc._id));
+            await existingPlan.save();
+            targetPlanId = existingPlan._id;
+            await logActivity({
+                entityType: 'TestPlan',
+                entityId: existingPlan._id,
+                workspace: workspaceId || undefined,
+                user: req.userId,
+                action: 'updated',
+                changedFields: ['testCases'],
+            });
+            await syncPlanStatusFromTestCases({ planId: existingPlan._id, actingUserId: req.userId, io: req.io });
+        } else if (newPlanName) {
+            const newPlan = await TestPlan.create({
+                name: newPlanName,
+                description: `Imported from ${req.file.originalname}`,
+                testCases: inserted.map(tc => tc._id),
+                user: req.userId,
+                ...(workspaceId && { workspace: workspaceId }),
+            });
+            targetPlanId = newPlan._id;
+            await logActivity({
+                entityType: 'TestPlan',
+                entityId: newPlan._id,
+                workspace: workspaceId || undefined,
+                user: req.userId,
+                action: 'created',
+            });
+            await syncPlanStatusFromTestCases({ planId: newPlan._id, actingUserId: req.userId, io: req.io });
+        }
+
         res.status(201).json({
             message: 'Test cases imported successfully',
             count: inserted.length,
             testCases: inserted,
+            planId: targetPlanId,
         });
     } catch (error) {
         console.error('Import error:', error);
@@ -330,8 +380,9 @@ router.put('/:id', async (req, res, next) => {
         }
 
         // Emit real-time update if executionStatus was changed
+        let affectedPlans = [];
         if (statusChanged) {
-            const affectedPlans = await TestPlan.find({ testCases: testCase._id });
+            affectedPlans = await TestPlan.find({ testCases: testCase._id });
             affectedPlans.forEach(plan => {
                 if (req.io) {
                     req.io.to(plan._id.toString()).emit('testCaseStatusUpdated', {
@@ -344,6 +395,19 @@ router.put('/:id', async (req, res, next) => {
                     });
                 }
             });
+        }
+
+        // A bug-tracking field change can flip a containing plan's overall
+        // status (see planStatusSync.js) — recompute for every plan this
+        // test case belongs to, not just ones already fetched above.
+        const bugFieldsChanged = ['bugType', 'fixStatus'].some(f => editedFields.includes(f));
+        if (bugFieldsChanged) {
+            const plansToSync = affectedPlans.length > 0
+                ? affectedPlans
+                : await TestPlan.find({ testCases: testCase._id }, '_id');
+            for (const plan of plansToSync) {
+                await syncPlanStatusFromTestCases({ planId: plan._id, actingUserId: req.userId, io: req.io });
+            }
         }
 
         res.json(testCase);
@@ -376,6 +440,9 @@ router.delete('/:id', deleteLimiter, async (req, res, next) => {
                 plan.status = 'Obsolete';
             }
             await plan.save();
+            // Removing the deleted test case can resolve the plan's only
+            // unfixed bug — recheck whether that flips its status.
+            await syncPlanStatusFromTestCases({ planId: plan._id, actingUserId: req.userId, io: req.io });
         }
 
         res.json({

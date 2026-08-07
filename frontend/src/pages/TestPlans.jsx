@@ -135,8 +135,31 @@ const TestPlans = () => {
 
         socket.on('testCaseStatusUpdated', handleTestCaseUpdate);
 
+        // The plan's own status can change server-side too — e.g. a bug's
+        // fixStatus flips the plan's auto-computed Pass/Fail (see
+        // planStatusSync.js on the backend). That event only carries the
+        // planId, so just refetch rather than trying to reconstruct the
+        // patch client-side.
+        const handleTestPlanUpdate = async (data) => {
+            if (data.planId !== selectedPlan._id) return;
+            try {
+                const res = await testPlansAPI.getAll();
+                const updated = res.data.find(p => p._id === data.planId);
+                if (updated) {
+                    setSelectedPlan(updated);
+                    setTestPlans(res.data);
+                }
+                setHistoryRefresh(v => v + 1);
+            } catch {
+                // Best effort — the plan will still be correct on next manual refresh.
+            }
+        };
+
+        socket.on('testPlanStatusUpdated', handleTestPlanUpdate);
+
         return () => {
             socket.off('testCaseStatusUpdated', handleTestCaseUpdate);
+            socket.off('testPlanStatusUpdated', handleTestPlanUpdate);
             socket.emit('leaveRoom', selectedPlan._id);
         };
     }, [selectedPlan?._id]);
@@ -144,7 +167,13 @@ const TestPlans = () => {
     const fetchTestPlans = async () => {
         try {
             const res = await testPlansAPI.getAll();
-            setTestPlans(res.data || []);
+            const fresh = res.data || [];
+            setTestPlans(fresh);
+            // Keep the open detail panel in sync too — otherwise an edit
+            // (e.g. changing which test cases belong to the plan, which can
+            // also flip its auto-computed status) only shows up in the list
+            // on the left until the plan is deselected and reselected.
+            setSelectedPlan(prev => (prev ? fresh.find(p => p._id === prev._id) || prev : prev));
         } catch (err) { console.error('Failed to load plans', err); }
         finally { setLoading(false); }
     };
@@ -722,6 +751,7 @@ const TestPlans = () => {
                                                             <tr>
                                                                 <th>#</th>
                                                                 <th>Title</th>
+                                                                <th>Feature/Module</th>
                                                                 <th>Priority</th>
                                                                 <th>Status</th>
                                                                 <th>Set Result</th>
@@ -733,8 +763,8 @@ const TestPlans = () => {
                                                                     <td style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>{i + 1}</td>
                                                                     <td>
                                                                         <div style={{ fontWeight: 500 }}>{tc.title}</div>
-                                                                        {tc.feature && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{tc.feature}</div>}
                                                                     </td>
+                                                                    <td style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.feature || '—'}</td>
                                                                     <td><StatusTag status={tc.priority || 'Medium'} /></td>
                                                                     <td><StatusTag status={tc.executionStatus || 'Pending'} /></td>
                                                                     <td>
