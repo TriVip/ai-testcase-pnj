@@ -81,9 +81,11 @@ export const testCasesAPI = {
     update: (id, data) => api.put(`/testcases/${id}`, data),
     delete: (id) => api.delete(`/testcases/${id}`),
     batchDelete: (ids) => api.post('/testcases/batch-delete', { ids }),
-    importTestCases: (file) => {
+    importTestCases: (file, { planId, newPlanName } = {}) => {
         const formData = new FormData();
         formData.append('file', file);
+        if (planId) formData.append('planId', planId);
+        if (newPlanName) formData.append('newPlanName', newPlanName);
         return api.post('/testcases/import', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',

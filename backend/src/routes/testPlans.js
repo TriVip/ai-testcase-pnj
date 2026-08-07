@@ -5,6 +5,7 @@ import { createRateLimiter } from '../middleware/rateLimit.js';
 import { buildScopeQuery, resolveWorkspaceForWrite } from '../utils/workspaceAccess.js';
 import { logActivity } from '../utils/activityLog.js';
 import ActivityLog from '../models/ActivityLog.js';
+import { syncPlanStatusFromTestCases } from '../utils/planStatusSync.js';
 
 // Nested populate so each test case in a plan carries its own executor info,
 // same shape as the standalone /api/testcases endpoints.
@@ -122,6 +123,16 @@ router.post('/', async (req, res, next) => {
             action: 'created',
         });
 
+        if (testPlan.testCases.length > 0) {
+            const changed = await syncPlanStatusFromTestCases({ planId: testPlan._id, actingUserId: req.userId, io: req.io });
+            if (changed) {
+                const fresh = await TestPlan.findById(testPlan._id)
+                    .populate(populateTestCasesWithExecutor)
+                    .populate('executedBy', 'name email picture');
+                return res.status(201).json(fresh);
+            }
+        }
+
         res.status(201).json(testPlan);
     } catch (error) {
         next(error);
@@ -180,6 +191,22 @@ router.put('/:id', async (req, res, next) => {
             });
         }
 
+        // This is the route the "Edit Test Plan" form actually uses to
+        // change plan membership (sending the whole `testCases` array), so
+        // it's the real place to recompute the bug-driven status — not just
+        // the dedicated add/remove-one-test-case endpoints below, which the
+        // UI doesn't call. Skip it if the caller set executionStatus in the
+        // same request: that's an explicit manual choice and should win.
+        if (!statusChanged && editedFields.includes('testCases')) {
+            const changed = await syncPlanStatusFromTestCases({ planId: testPlan._id, actingUserId: req.userId, io: req.io });
+            if (changed) {
+                const fresh = await TestPlan.findById(testPlan._id)
+                    .populate(populateTestCasesWithExecutor)
+                    .populate('executedBy', 'name email picture');
+                return res.json(fresh);
+            }
+        }
+
         res.json(testPlan);
     } catch (error) {
         next(error);
@@ -229,6 +256,16 @@ router.post('/:id/testcases', async (req, res, next) => {
                 action: 'updated',
                 changedFields: ['testCases'],
             });
+
+            // The newly added test case may carry an unresolved bug that
+            // should flip this plan's status immediately.
+            const changed = await syncPlanStatusFromTestCases({ planId: testPlan._id, actingUserId: req.userId, io: req.io });
+            if (changed) {
+                const fresh = await TestPlan.findById(testPlan._id)
+                    .populate(populateTestCasesWithExecutor)
+                    .populate('executedBy', 'name email picture');
+                return res.json(fresh);
+            }
         }
 
         await testPlan.populate(populateTestCasesWithExecutor);
@@ -269,6 +306,16 @@ router.delete('/:id/testcases/:testCaseId', async (req, res, next) => {
             action: 'updated',
             changedFields: ['testCases'],
         });
+
+        // Removing this test case may have resolved the plan's only
+        // unfixed bug — recheck whether that flips its status.
+        const changed = await syncPlanStatusFromTestCases({ planId: testPlan._id, actingUserId: req.userId, io: req.io });
+        if (changed) {
+            const fresh = await TestPlan.findById(testPlan._id)
+                .populate(populateTestCasesWithExecutor)
+                .populate('executedBy', 'name email picture');
+            return res.json(fresh);
+        }
 
         await testPlan.populate(populateTestCasesWithExecutor);
 
