@@ -202,78 +202,86 @@ const WorkspaceSelector = () => {
                 </div>
             )}
 
-            <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                style={{
-                    display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                    padding: '8px 12px', background: isDropdownOpen ? 'var(--bg-sidebar-active)' : 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: 'var(--radius)', color: 'var(--text-on-sidebar-active)', cursor: 'pointer',
-                    fontSize: 'var(--text-sm)', fontWeight: 600, transition: 'var(--transition)'
-                }}
-                onMouseEnter={(e) => { if (!isDropdownOpen) e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)'; }}
-                onMouseLeave={(e) => { if (!isDropdownOpen) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'; }}
-                title={activeWorkspace ? activeWorkspace.name : 'Select Workspace'}
-            >
-                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'left' }}>
-                    {activeWorkspace ? activeWorkspace.name : 'Select Workspace'}
-                </div>
-                <div style={{ flexShrink: 0 }}>
-                    <IconChevronDown />
-                </div>
-            </button>
+            {/* Positioned relative to just this wrapper — not the outer
+                container, which also holds the invite/leave buttons and the
+                member list below. Anchoring to the outer container made the
+                dropdown's `top: 100%` resolve against the height of all of
+                that trailing content too, so it opened far below the toggle
+                button instead of right under it. */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    style={{
+                        display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                        padding: '8px 12px', background: isDropdownOpen ? 'var(--bg-sidebar-active)' : 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 'var(--radius)', color: 'var(--text-on-sidebar-active)', cursor: 'pointer',
+                        fontSize: 'var(--text-sm)', fontWeight: 600, transition: 'var(--transition)'
+                    }}
+                    onMouseEnter={(e) => { if (!isDropdownOpen) e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)'; }}
+                    onMouseLeave={(e) => { if (!isDropdownOpen) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'; }}
+                    title={activeWorkspace ? activeWorkspace.name : 'Select Workspace'}
+                >
+                    <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'left' }}>
+                        {activeWorkspace ? activeWorkspace.name : 'Select Workspace'}
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                        <IconChevronDown />
+                    </div>
+                </button>
 
-            {
-                isDropdownOpen && (
-                    <div style={{
-                        position: 'absolute', top: '100%', left: 16, right: 16, zIndex: 100,
-                        background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)',
-                        marginTop: 4, padding: '4px 0', maxHeight: 250, overflowY: 'auto'
-                    }}>
-                        <div style={{ padding: '6px 12px', fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Your Workspaces
-                        </div>
-                        {workspaces.map(w => (
+                {
+                    isDropdownOpen && (
+                        <div style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)',
+                            marginTop: 4, padding: '4px 0', maxHeight: 250, overflowY: 'auto'
+                        }}>
+                            <div style={{ padding: '6px 12px', fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Your Workspaces
+                            </div>
+                            {workspaces.map(w => (
+                                <button
+                                    key={w._id}
+                                    onClick={() => {
+                                        setActiveWorkspace(w);
+                                        setIsDropdownOpen(false);
+                                    }}
+                                    title={w.name}
+                                    style={{
+                                        display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px',
+                                        background: activeWorkspace?._id === w._id ? 'var(--bg-surface-2)' : 'transparent',
+                                        border: 'none', color: 'var(--text-primary)', cursor: 'pointer',
+                                        fontSize: 'var(--text-sm)', transition: 'background-color var(--transition-fast)'
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface-2)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = activeWorkspace?._id === w._id ? 'var(--bg-surface-2)' : 'transparent'; }}
+                                >
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {w.name}
+                                    </span>
+                                    {w.isPersonal && <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginLeft: 8, flexShrink: 0 }}>(Personal)</span>}
+                                </button>
+                            ))}
+
+                            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
                             <button
-                                key={w._id}
-                                onClick={() => {
-                                    setActiveWorkspace(w);
-                                    setIsDropdownOpen(false);
-                                }}
-                                title={w.name}
+                                onClick={() => { setIsCreateModalOpen(true); setIsDropdownOpen(false); }}
                                 style={{
-                                    display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px',
-                                    background: activeWorkspace?._id === w._id ? 'var(--bg-surface-2)' : 'transparent',
-                                    border: 'none', color: 'var(--text-primary)', cursor: 'pointer',
-                                    fontSize: 'var(--text-sm)', transition: 'background-color var(--transition-fast)'
+                                    display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '8px 12px',
+                                    background: 'transparent', border: 'none', color: 'var(--brand)', cursor: 'pointer',
+                                    fontSize: 'var(--text-sm)', fontWeight: 500, gap: 8, transition: 'background-color var(--transition-fast)'
                                 }}
                                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface-2)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = activeWorkspace?._id === w._id ? 'var(--bg-surface-2)' : 'transparent'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                             >
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {w.name}
-                                </span>
-                                {w.isPersonal && <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginLeft: 8, flexShrink: 0 }}>(Personal)</span>}
+                                <IconPlus /> Create New Workspace
                             </button>
-                        ))}
-
-                        <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-
-                        <button
-                            onClick={() => { setIsCreateModalOpen(true); setIsDropdownOpen(false); }}
-                            style={{
-                                display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', padding: '8px 12px',
-                                background: 'transparent', border: 'none', color: 'var(--brand)', cursor: 'pointer',
-                                fontSize: 'var(--text-sm)', fontWeight: 500, gap: 8, transition: 'background-color var(--transition-fast)'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface-2)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                            <IconPlus /> Create New Workspace
-                        </button>
-                    </div>
-                )}
+                        </div>
+                    )}
+            </div>
 
             {activeWorkspace && !activeWorkspace.isPersonal && (
                 <button
