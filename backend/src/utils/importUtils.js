@@ -74,7 +74,18 @@ const parseXLSX = async (buffer) => {
 const parseCSV = (buffer) => {
     return new Promise((resolve, reject) => {
         const results = [];
-        const stream = Readable.from(buffer.toString());
+        // Excel writes a UTF-8 BOM at the start of CSV exports. Left in, it
+        // attaches to the first header cell (so "ID" is read as "ID" plus a
+        // leading zero-width character), so every row['ID'] lookup misses
+        // and externalId silently comes back empty for the whole file — no
+        // error, just quietly dropped data. Char code 0xFEFF, not a regex
+        // escape, so the fix doesn't depend on a literal Unicode character
+        // surviving edits to this file.
+        let text = buffer.toString('utf8');
+        if (text.charCodeAt(0) === 0xFEFF) {
+            text = text.slice(1);
+        }
+        const stream = Readable.from(text);
 
         stream
             .pipe(csv())
@@ -149,15 +160,18 @@ const parseSteps = (rawValue, rowExpectedResult) => {
 };
 
 // Maps the execution-status values the template's dropdown offers (and their
-// case-insensitive variants) onto the model's own enum. UNTESTED has no
-// literal equivalent in the model — it means "not run yet", the same as the
-// model's default, so it maps to Pending.
+// case-insensitive variants) onto the model's own enum. UNTESTED and BLOCKED
+// have no literal equivalent in the model — neither has actually been run,
+// which is what Pending means (the reason a BLOCKED row can't run yet
+// belongs in, and is normally already captured by, the notes/Ghi chú
+// column, not the status itself).
 const normalizeExecutionStatus = (raw) => {
     const trimmed = (raw ?? '').toString().trim();
     if (!trimmed) return 'Pending';
 
     switch (trimmed.toUpperCase()) {
         case 'UNTESTED':
+        case 'BLOCKED':
         case 'PENDING':
             return 'Pending';
         case 'PASS':
