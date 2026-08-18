@@ -17,6 +17,16 @@ const ImportTestCaseModal = ({ onClose, onImportComplete }) => {
     const [newPlanName, setNewPlanName] = useState('');
 
     useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && !uploading) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, uploading]);
+
+    useEffect(() => {
         testPlansAPI.getAll()
             .then(res => setPlans(res.data || []))
             .catch(() => setPlans([]));

@@ -47,10 +47,52 @@ const pickAllowedFields = (source = {}) => {
 router.use(isAuthenticated);
 
 // @route   GET /api/testplans
-// @desc    Get all test plans for current user in active workspace
+// @desc    Get all test plans for current user in active workspace (supports pagination & filtering via query params)
 router.get('/', async (req, res, next) => {
     try {
-        const query = await buildScopeQuery(req);
+        const { page, limit, search, status, executionStatus } = req.query;
+        const extra = {};
+
+        if (search && typeof search === 'string') {
+            const searchRegex = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            extra.$or = [
+                { name: searchRegex },
+                { description: searchRegex },
+            ];
+        }
+        if (status && status !== 'All') extra.status = status;
+        if (executionStatus && executionStatus !== 'All') extra.executionStatus = executionStatus;
+
+        const query = await buildScopeQuery(req, extra);
+
+        if (page !== undefined || limit !== undefined) {
+            const pageNum = Math.max(1, parseInt(page, 10) || 1);
+            const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+            const skip = (pageNum - 1) * limitNum;
+
+            const [testPlans, total] = await Promise.all([
+                TestPlan.find(query)
+                    .populate(populateTestCasesWithExecutor)
+                    .populate('executedBy', 'name email picture')
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(limitNum),
+                TestPlan.countDocuments(query),
+            ]);
+
+            const totalPages = Math.ceil(total / limitNum) || 1;
+
+            return res.json({
+                testPlans,
+                pagination: {
+                    total,
+                    page: pageNum,
+                    limit: limitNum,
+                    totalPages,
+                    hasMore: pageNum < totalPages,
+                },
+            });
+        }
 
         const testPlans = await TestPlan.find(query)
             .populate(populateTestCasesWithExecutor)

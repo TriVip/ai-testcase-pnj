@@ -77,10 +77,57 @@ const upload = multer({
 router.use(isAuthenticated);
 
 // @route   GET /api/testcases
-// @desc    Get all test cases for current user in active workspace
+// @desc    Get all test cases for current user in active workspace (supports pagination & filtering via query params)
 router.get('/', async (req, res, next) => {
     try {
-        const query = await buildScopeQuery(req);
+        const { page, limit, search, priority, status, category, feature, executionStatus, fixStatus } = req.query;
+        const extra = {};
+
+        if (search && typeof search === 'string') {
+            const searchRegex = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            extra.$or = [
+                { title: searchRegex },
+                { description: searchRegex },
+                { category: searchRegex },
+                { externalId: searchRegex },
+            ];
+        }
+        if (priority && priority !== 'All') extra.priority = priority;
+        if (status && status !== 'All') extra.status = status;
+        if (category && category !== 'All') extra.category = category;
+        if (feature && feature !== 'All') extra.feature = feature;
+        if (executionStatus && executionStatus !== 'All') extra.executionStatus = executionStatus;
+        if (fixStatus && fixStatus !== 'All') extra.fixStatus = fixStatus;
+
+        const query = await buildScopeQuery(req, extra);
+
+        if (page !== undefined || limit !== undefined) {
+            const pageNum = Math.max(1, parseInt(page, 10) || 1);
+            const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+            const skip = (pageNum - 1) * limitNum;
+
+            const [testCases, total] = await Promise.all([
+                TestCase.find(query)
+                    .populate('executedBy', 'name email picture')
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(limitNum),
+                TestCase.countDocuments(query),
+            ]);
+
+            const totalPages = Math.ceil(total / limitNum) || 1;
+
+            return res.json({
+                testCases,
+                pagination: {
+                    total,
+                    page: pageNum,
+                    limit: limitNum,
+                    totalPages,
+                    hasMore: pageNum < totalPages,
+                },
+            });
+        }
 
         const testCases = await TestCase.find(query)
             .populate('executedBy', 'name email picture')
@@ -239,10 +286,10 @@ router.post('/batch-delete', deleteLimiter, async (req, res, next) => {
         const result = await TestCase.deleteMany(query);
 
         // Clean up references in test plans and auto-obsolete empty plans
-        const affectedPlans = await TestPlan.find({
-            user: req.userId,
+        const planQuery = await buildScopeQuery(req, {
             testCases: { $in: ids },
         });
+        const affectedPlans = await TestPlan.find(planQuery);
 
         for (const plan of affectedPlans) {
             plan.testCases = plan.testCases.filter(tcId => !ids.includes(tcId.toString()));
@@ -250,6 +297,7 @@ router.post('/batch-delete', deleteLimiter, async (req, res, next) => {
                 plan.status = 'Obsolete';
             }
             await plan.save();
+            await syncPlanStatusFromTestCases({ planId: plan._id, actingUserId: req.userId, io: req.io });
         }
 
         res.json({
@@ -429,10 +477,10 @@ router.delete('/:id', deleteLimiter, async (req, res, next) => {
         }
 
         // Clean up references in test plans and auto-obsolete empty plans
-        const affectedPlans = await TestPlan.find({
-            user: req.userId,
+        const planQuery = await buildScopeQuery(req, {
             testCases: req.params.id,
         });
+        const affectedPlans = await TestPlan.find(planQuery);
 
         for (const plan of affectedPlans) {
             plan.testCases = plan.testCases.filter(tcId => tcId.toString() !== req.params.id);

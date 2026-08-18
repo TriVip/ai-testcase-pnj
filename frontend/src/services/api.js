@@ -75,7 +75,7 @@ export const authAPI = {
 
 // Test Cases API
 export const testCasesAPI = {
-    getAll: () => api.get('/testcases'),
+    getAll: (params) => api.get('/testcases', { params }),
     getOne: (id) => api.get(`/testcases/${id}`),
     create: (data) => api.post('/testcases', data),
     update: (id, data) => api.put(`/testcases/${id}`, data),
@@ -102,7 +102,7 @@ export const testCasesAPI = {
 
 // Test Plans API
 export const testPlansAPI = {
-    getAll: () => api.get('/testplans'),
+    getAll: (params) => api.get('/testplans', { params }),
     getOne: (id) => api.get(`/testplans/${id}`),
     create: (data) => api.post('/testplans', data),
     update: (id, data) => api.put(`/testplans/${id}`, data),

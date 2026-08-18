@@ -185,7 +185,9 @@ app.use((req, res, next) => {
 app.set('trust proxy', 1);
 
 // Connect to MongoDB
-connectDB();
+if (process.env.NODE_ENV !== 'test') {
+    connectDB();
+}
 
 // Security headers. CSP is left off because this process serves JSON, not
 // HTML it renders itself; the remaining defaults (HSTS, nosniff, frameguard,
@@ -279,7 +281,11 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 9999;
-httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on port ${PORT} (0.0.0.0)`);
-    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    httpServer.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running on port ${PORT} (0.0.0.0)`);
+        console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+}
+
+export { app, httpServer, io };

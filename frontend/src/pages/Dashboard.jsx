@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import AppShell from '../components/AppShell';
+import StatusTag from '../components/StatusTag';
+import { SkeletonTile, SkeletonTable } from '../components/common/Skeleton';
 import { testCasesAPI, testPlansAPI } from '../services/api';
 
 const Dashboard = () => {
@@ -17,14 +19,14 @@ const Dashboard = () => {
                     testCasesAPI.getAll(),
                     testPlansAPI.getAll(),
                 ]);
-                const tcs = tcRes.data || [];
-                const plans = plansRes.data || [];
+                const tcs = Array.isArray(tcRes.data) ? tcRes.data : (tcRes.data?.testCases || []);
+                const plans = Array.isArray(plansRes.data) ? plansRes.data : (plansRes.data?.testPlans || []);
 
-                const pass = tcs.filter(t => t.executionStatus === 'Pass').length;
-                const failed = tcs.filter(t => t.executionStatus === 'Failed').length;
-                const pending = tcs.filter(t => t.executionStatus === 'Pending').length;
-                const na = tcs.filter(t => t.executionStatus === 'N/A').length;
-                const activePlans = plans.filter(p => p.status === 'In Progress' || p.status === 'Planning').length;
+                const pass = tcs.filter((t) => t.executionStatus === 'Pass').length;
+                const failed = tcs.filter((t) => t.executionStatus === 'Failed').length;
+                const pending = tcs.filter((t) => t.executionStatus === 'Pending').length;
+                const na = tcs.filter((t) => t.executionStatus === 'N/A').length;
+                const activePlans = plans.filter((p) => p.status === 'In Progress' || p.status === 'Planning').length;
                 const passRate = tcs.length > 0 ? Math.round((pass / tcs.length) * 100) : 0;
 
                 setStats({ total: tcs.length, pass, failed, pending, na, passRate, activePlans, totalPlans: plans.length });
@@ -48,15 +50,6 @@ const Dashboard = () => {
         return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
-    const StatusDot = ({ status }) => {
-        const map = {
-            Pass: 'var(--status-pass)',
-            Failed: 'var(--status-fail)',
-            Pending: 'var(--status-pending)',
-        };
-        return <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: map[status] || map.Pending, marginRight: 4 }} />;
-    };
-
     return (
         <AppShell>
             <div className="page-inner">
@@ -69,18 +62,27 @@ const Dashboard = () => {
                 </div>
 
                 {loading ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
-                        <div className="spinner" /> Loading metrics…
+                    <div>
+                        <SkeletonTile count={4} />
+                        <div className="dashboard-content-grid">
+                            <div className="panel" style={{ padding: 'var(--space-4)' }}>
+                                <SkeletonTable rows={5} cols={4} />
+                            </div>
+                            <div className="panel" style={{ padding: 'var(--space-4)', height: 200 }} />
+                        </div>
                     </div>
                 ) : (
                     <>
                         {/* KPI Strip */}
-                        <div className="kpi-grid" style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                            gap: 'var(--space-4)',
-                            marginBottom: 'var(--space-8)',
-                        }}>
+                        <div
+                            className="kpi-grid"
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                                gap: 'var(--space-4)',
+                                marginBottom: 'var(--space-8)',
+                            }}
+                        >
                             <div className="kpi-tile">
                                 <div className="kpi-label">Total Test Cases</div>
                                 <div className="kpi-value">{stats.total}</div>
@@ -94,9 +96,20 @@ const Dashboard = () => {
                                 </div>
                             </div>
 
-                            <div className="kpi-tile" style={{ borderTopColor: stats.passRate >= 80 ? 'var(--status-pass)' : stats.passRate >= 50 ? 'var(--status-warn)' : 'var(--status-fail)', borderTopWidth: 2 }}>
+                            <div
+                                className="kpi-tile"
+                                style={{
+                                    borderTopColor: stats.passRate >= 80 ? 'var(--status-pass)' : stats.passRate >= 50 ? 'var(--status-warn)' : 'var(--status-fail)',
+                                    borderTopWidth: 2,
+                                }}
+                            >
                                 <div className="kpi-label">Pass Rate</div>
-                                <div className="kpi-value" style={{ color: stats.passRate >= 80 ? 'var(--status-pass-text)' : stats.passRate >= 50 ? 'var(--status-warn-text)' : 'var(--status-fail-text)' }}>
+                                <div
+                                    className="kpi-value"
+                                    style={{
+                                        color: stats.passRate >= 80 ? 'var(--status-pass-text)' : stats.passRate >= 50 ? 'var(--status-warn-text)' : 'var(--status-fail-text)',
+                                    }}
+                                >
                                     {stats.passRate}%
                                 </div>
                                 <div className="kpi-delta">of {stats.total} executed</div>
@@ -108,9 +121,17 @@ const Dashboard = () => {
                                 <div className="kpi-delta">{stats.totalPlans} total plans</div>
                             </div>
 
-                            <div className="kpi-tile" style={{ borderTopColor: stats.failed > 0 ? 'var(--status-fail)' : 'transparent', borderTopWidth: 2 }}>
+                            <div
+                                className="kpi-tile"
+                                style={{
+                                    borderTopColor: stats.failed > 0 ? 'var(--status-fail)' : 'transparent',
+                                    borderTopWidth: 2,
+                                }}
+                            >
                                 <div className="kpi-label">Failed</div>
-                                <div className="kpi-value" style={{ color: stats.failed > 0 ? 'var(--status-fail-text)' : 'var(--text-primary)' }}>{stats.failed}</div>
+                                <div className="kpi-value" style={{ color: stats.failed > 0 ? 'var(--status-fail-text)' : 'var(--text-primary)' }}>
+                                    {stats.failed}
+                                </div>
                                 <div className="kpi-delta">require attention</div>
                             </div>
                         </div>
@@ -146,19 +167,18 @@ const Dashboard = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {recentTCs.map(tc => (
+                                            {recentTCs.map((tc) => (
                                                 <tr key={tc._id}>
                                                     <td style={{ maxWidth: 280 }}>
-                                                        <span className="truncate" style={{ display: 'block', fontWeight: 500 }}>{tc.title}</span>
-                                                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{tc.category || '—'}</span>
-                                                    </td>
-                                                    <td><span className={`status-tag prio-${tc.priority?.toLowerCase()}`}>{tc.priority}</span></td>
-                                                    <td>
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                                            <StatusDot status={tc.executionStatus} />
-                                                            <span style={{ fontSize: 'var(--text-xs)' }}>{tc.executionStatus || 'Pending'}</span>
+                                                        <span className="truncate" style={{ display: 'block', fontWeight: 500 }}>
+                                                            {tc.title}
+                                                        </span>
+                                                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                                                            {tc.category || '—'}
                                                         </span>
                                                     </td>
+                                                    <td><StatusTag status={tc.priority || 'Medium'} /></td>
+                                                    <td><StatusTag status={tc.executionStatus || 'Pending'} variant="dot" /></td>
                                                     <td style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
                                                         {fmtDate(tc.updatedAt || tc.createdAt)}
                                                     </td>
@@ -190,8 +210,6 @@ const Dashboard = () => {
                                         </Link>
                                     </div>
                                 </div>
-
-
                             </div>
                         </div>
                     </>

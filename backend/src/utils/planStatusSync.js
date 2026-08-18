@@ -14,7 +14,7 @@ import { logActivity } from './activityLog.js';
  *    unset with no 'Chưa fix' present) -> ambiguous, return null so the
  *    caller leaves the plan's status under manual control.
  */
-const computeBugDrivenStatus = (testCases) => {
+export const computeBugDrivenStatus = (testCases) => {
     const bugTracked = testCases.filter((tc) => tc.bugType);
     if (bugTracked.length === 0) return null;
     if (bugTracked.some((tc) => tc.fixStatus === 'Chưa fix')) return 'Failed';

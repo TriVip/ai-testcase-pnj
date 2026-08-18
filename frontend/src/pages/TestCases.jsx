@@ -1,152 +1,177 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
-import StatusTag from '../components/StatusTag';
 import { testCasesAPI, testPlansAPI, aiAPI } from '../services/api';
 import { exportTestCasesToXLSX } from '../utils/exportToXLSX';
+import { useToast } from '../components/Toast';
 import TestCaseForm from '../components/TestCaseForm';
 import AISuggestionModal from '../components/AISuggestionModal';
 import ImportTestCaseModal from '../components/ImportTestCaseModal';
-import ActivityHistory from '../components/ActivityHistory';
-import { useToast, ToastContainer } from '../components/Toast';
-import { buildTcToPlansMap } from '../utils/testPlanLookup';
+import Pagination from '../components/common/Pagination';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import { SkeletonTable } from '../components/common/Skeleton';
+import TestCaseFilterBar from '../components/testcases/TestCaseFilterBar';
+import TestCaseBulkActionBar from '../components/testcases/TestCaseBulkActionBar';
+import TestCaseTableRow from '../components/testcases/TestCaseTableRow';
 
-const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-}) : null;
+const ITEMS_PER_PAGE = 20;
 
-const ITEMS_PER_PAGE = 25;
-
-const ChevronDown = () => (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="6 9 12 15 18 9" />
-    </svg>
-);
-
-const ChevronRight = () => (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="9 18 15 12 9 6" />
-    </svg>
-);
-
-const SortIcon = ({ dir }) => (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 4, opacity: dir ? 1 : 0.3 }}>
-        {dir === 'asc'
-            ? <path d="M12 5l7 7H5l7-7z" />
-            : dir === 'desc'
-                ? <path d="M12 19l7-7H5l7 7z" />
-                : <path d="M12 5l7 7H5l7-7zM12 19l7-7H5l7 7z" opacity="0.5" />}
-    </svg>
-);
+const buildTcToPlansMap = (plans) => {
+    const map = {};
+    for (const plan of plans) {
+        for (const tc of plan.testCases || []) {
+            const tcId = tc._id || tc;
+            if (!map[tcId]) map[tcId] = [];
+            map[tcId].push({ _id: plan._id, name: plan.name });
+        }
+    }
+    return map;
+};
 
 const TestCases = () => {
+    const toast = useToast();
+    const navigate = useNavigate();
+
+    // Data state
     const [testCases, setTestCases] = useState([]);
     const [testPlans, setTestPlans] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Modal state
     const [showForm, setShowForm] = useState(false);
     const [showAIModal, setShowAIModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [editingTestCase, setEditingTestCase] = useState(null);
-    const [expandedRow, setExpandedRow] = useState(null);
-    const [selectedIds, setSelectedIds] = useState(new Set());
-    const [improvingId, setImprovingId] = useState(null);
-    const [deleting, setDeleting] = useState(false);
-    // Bumped after an action writes a new activity-log entry for the
-    // expanded row, so its History section re-fetches without needing the
-    // row to collapse/re-expand.
-    const [historyRefresh, setHistoryRefresh] = useState(0);
 
-    // Filters
+    // Confirm dialog state
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        confirmText: 'Confirm',
+        cancelText: 'Cancel',
+        variant: 'danger',
+        onConfirm: null,
+    });
+
+    // Selection & expansion
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [expandedRow, setExpandedRow] = useState(null);
+
+    // Filter & search state
     const [searchTerm, setSearchTerm] = useState('');
     const [priorityFilter, setPriorityFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [planFilter, setPlanFilter] = useState('All');
 
-    // Sort
-    const [sortCol, setSortCol] = useState('');
-    const [sortDir, setSortDir] = useState('asc');
+    // Sort state
+    const [sortCol, setSortCol] = useState('updatedAt');
+    const [sortDir, setSortDir] = useState('desc');
 
-    // Pagination
+    // Pagination state
     const [page, setPage] = useState(1);
 
-    const searchRef = useRef(null);
-    const toast = useToast();
-    const navigate = useNavigate();
-
-    // "/" shortcut focuses search
-    useEffect(() => {
-        const handler = (e) => {
-            if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                e.preventDefault();
-                searchRef.current?.focus();
-            }
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, []);
+    // Action loading states
+    const [deleting, setDeleting] = useState(false);
+    const [improvingId, setImprovingId] = useState(null);
+    const [historyRefresh, setHistoryRefresh] = useState(0);
 
     useEffect(() => {
-        fetchTestCases();
-        testPlansAPI.getAll().then(res => setTestPlans(res.data || [])).catch(() => setTestPlans([]));
+        fetchAll();
     }, []);
 
-    const fetchTestCases = async () => {
+    const fetchAll = async () => {
         try {
             setLoading(true);
-            const res = await testCasesAPI.getAll();
-            setTestCases(res.data || []);
+            const [tcRes, planRes] = await Promise.all([
+                testCasesAPI.getAll(),
+                testPlansAPI.getAll(),
+            ]);
+            setTestCases(Array.isArray(tcRes.data) ? tcRes.data : (tcRes.data?.testCases || []));
+            setTestPlans(Array.isArray(planRes.data) ? planRes.data : (planRes.data?.testPlans || []));
         } catch {
-            toast.error('Failed to load test cases');
+            toast.error('Failed to load data');
         } finally {
             setLoading(false);
         }
     };
 
+    const fetchTestCases = async () => {
+        try {
+            const res = await testCasesAPI.getAll();
+            setTestCases(Array.isArray(res.data) ? res.data : (res.data?.testCases || []));
+        } catch {
+            toast.error('Failed to load test cases');
+        }
+    };
+
     const tcToPlans = useMemo(() => buildTcToPlansMap(testPlans), [testPlans]);
 
-    const handleDelete = async (id) => {
-        if (!confirm('Delete this test case?')) return;
-        setDeleting(true);
-        try {
-            await testCasesAPI.delete(id);
-            setTestCases(prev => prev.filter(tc => tc._id !== id));
-            setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; });
-            if (expandedRow === id) setExpandedRow(null);
-            toast.success('Test case deleted');
-        } catch (err) {
-            if (err.response?.status === 429) {
-                toast.error('Too many delete requests. Please slow down.');
-            } else {
-                toast.error('Failed to delete');
-            }
-        } finally {
-            setDeleting(false);
-        }
+    const handleDelete = (id, title = '') => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Delete Test Case',
+            message: `Are you sure you want to delete test case "${title || 'this item'}"? This action cannot be undone.`,
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            variant: 'danger',
+            onConfirm: async () => {
+                setDeleting(true);
+                try {
+                    await testCasesAPI.delete(id);
+                    setTestCases((prev) => prev.filter((tc) => tc._id !== id));
+                    setSelectedIds((prev) => {
+                        const s = new Set(prev);
+                        s.delete(id);
+                        return s;
+                    });
+                    if (expandedRow === id) setExpandedRow(null);
+                    toast.success('Test case deleted');
+                } catch (err) {
+                    if (err.response?.status === 429) {
+                        toast.error('Too many delete requests. Please slow down.');
+                    } else {
+                        toast.error('Failed to delete');
+                    }
+                } finally {
+                    setDeleting(false);
+                    setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+                }
+            },
+        });
     };
 
-    const handleBulkDelete = async () => {
-        if (!confirm(`Delete ${selectedIds.size} test case(s)?`)) return;
-        setDeleting(true);
-        try {
-            const ids = [...selectedIds];
-            const res = await testCasesAPI.batchDelete(ids);
-            setTestCases(prev => prev.filter(tc => !selectedIds.has(tc._id)));
-            toast.success(`${res.data.deletedCount} test cases deleted`);
-            setSelectedIds(new Set());
-        } catch (err) {
-            if (err.response?.status === 429) {
-                toast.error('Too many delete requests. Please slow down.');
-            } else {
-                toast.error('Failed to delete some items');
-            }
-        } finally {
-            setDeleting(false);
-        }
+    const handleBulkDelete = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Batch Delete Test Cases',
+            message: `Are you sure you want to permanently delete ${selectedIds.size} selected test case(s)?`,
+            confirmText: `Delete ${selectedIds.size} Cases`,
+            cancelText: 'Cancel',
+            variant: 'danger',
+            onConfirm: async () => {
+                setDeleting(true);
+                try {
+                    const ids = [...selectedIds];
+                    const res = await testCasesAPI.batchDelete(ids);
+                    setTestCases((prev) => prev.filter((tc) => !selectedIds.has(tc._id)));
+                    toast.success(`${res.data.deletedCount} test cases deleted`);
+                    setSelectedIds(new Set());
+                } catch (err) {
+                    if (err.response?.status === 429) {
+                        toast.error('Too many delete requests. Please slow down.');
+                    } else {
+                        toast.error('Failed to delete some items');
+                    }
+                } finally {
+                    setDeleting(false);
+                    setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+                }
+            },
+        });
     };
 
-    // Building the workbook is async now, so a failure would otherwise surface
-    // only as an unhandled rejection with nothing shown to the user.
     const handleExport = async (rows) => {
         try {
             await exportTestCasesToXLSX(rows);
@@ -156,47 +181,61 @@ const TestCases = () => {
         }
     };
 
-    const handleImprove = async (tc) => {
-        if (!confirm('Let AI improve this test case?')) return;
-        setImprovingId(tc._id);
-        toast.info('AI is improving…', 2000);
-        try {
-            const res = await aiAPI.improveTestCase(tc);
-            const imp = res.data.improved;
-            await testCasesAPI.update(tc._id, {
-                title: imp.title, description: imp.description,
-                steps: imp.steps, priority: imp.priority, category: imp.category,
-            });
-            toast.success(imp.improvements ? `Improved: ${imp.improvements}` : 'Test case improved!', 5000);
-            fetchTestCases();
-            setHistoryRefresh(v => v + 1);
-        } catch (err) {
-            toast.error(err.response?.data?.error || 'AI improvement failed', 5000);
-        } finally {
-            setImprovingId(null);
-        }
+    const handleImprove = (tc) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Optimize with AI',
+            message: `Let OpenAI review and improve the clarity, test steps, and coverage for "${tc.title}"?`,
+            confirmText: 'Optimize Test Case',
+            cancelText: 'Cancel',
+            variant: 'primary',
+            onConfirm: async () => {
+                setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+                setImprovingId(tc._id);
+                toast.info('AI is improving test case…', 2500);
+                try {
+                    const res = await aiAPI.improveTestCase(tc);
+                    const imp = res.data.improved;
+                    await testCasesAPI.update(tc._id, {
+                        title: imp.title,
+                        description: imp.description,
+                        steps: imp.steps,
+                        priority: imp.priority,
+                        category: imp.category,
+                    });
+                    toast.success(imp.improvements ? `Improved: ${imp.improvements}` : 'Test case improved!', 5000);
+                    fetchTestCases();
+                    setHistoryRefresh((v) => v + 1);
+                } catch (err) {
+                    toast.error(err.response?.data?.error || 'AI improvement failed', 5000);
+                } finally {
+                    setImprovingId(null);
+                }
+            },
+        });
     };
 
     const handleFormClose = () => {
         setShowForm(false);
         setEditingTestCase(null);
         fetchTestCases();
-        setHistoryRefresh(v => v + 1);
+        setHistoryRefresh((v) => v + 1);
     };
 
     // ---- Derived data ----
-    const categories = ['All', ...Array.from(new Set(testCases.map(tc => tc.category).filter(Boolean)))];
+    const categories = ['All', ...Array.from(new Set(testCases.map((tc) => tc.category).filter(Boolean)))];
 
-    const filtered = testCases.filter(tc => {
+    const filtered = testCases.filter((tc) => {
         const search = searchTerm.toLowerCase();
-        const matchSearch = !search ||
+        const matchSearch =
+            !search ||
             tc.title?.toLowerCase().includes(search) ||
             tc.description?.toLowerCase().includes(search) ||
             tc.category?.toLowerCase().includes(search);
         const matchPriority = priorityFilter === 'All' || tc.priority === priorityFilter;
         const matchStatus = statusFilter === 'All' || tc.executionStatus === statusFilter;
         const matchCategory = categoryFilter === 'All' || tc.category === categoryFilter;
-        const matchPlan = planFilter === 'All' || (tcToPlans[tc._id] || []).some(p => p._id === planFilter);
+        const matchPlan = planFilter === 'All' || (tcToPlans[tc._id] || []).some((p) => p._id === planFilter);
         return matchSearch && matchPriority && matchStatus && matchCategory && matchPlan;
     });
 
@@ -214,7 +253,7 @@ const TestCases = () => {
 
     const toggleSort = (col) => {
         if (sortCol === col) {
-            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+            setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
         } else {
             setSortCol(col);
             setSortDir('asc');
@@ -223,7 +262,7 @@ const TestCases = () => {
     };
 
     const toggleSelect = (id) => {
-        setSelectedIds(prev => {
+        setSelectedIds((prev) => {
             const s = new Set(prev);
             s.has(id) ? s.delete(id) : s.add(id);
             return s;
@@ -231,10 +270,10 @@ const TestCases = () => {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === pageSlice.length) {
+        if (selectedIds.size === pageSlice.length && pageSlice.length > 0) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(pageSlice.map(tc => tc._id)));
+            setSelectedIds(new Set(pageSlice.map((tc) => tc._id)));
         }
     };
 
@@ -246,160 +285,114 @@ const TestCases = () => {
         setPlanFilter('All');
         setPage(1);
     };
-    const hasFilters = searchTerm || priorityFilter !== 'All' || statusFilter !== 'All' || categoryFilter !== 'All' || planFilter !== 'All';
 
-    if (loading) {
-        return (
-            <AppShell>
-                <div className="page-inner" style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-secondary)' }}>
-                    <div className="spinner spinner-lg" /> Loading test cases…
-                </div>
-            </AppShell>
-        );
-    }
+    const hasFilters =
+        searchTerm || priorityFilter !== 'All' || statusFilter !== 'All' || categoryFilter !== 'All' || planFilter !== 'All';
 
     return (
         <>
-            <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
             <AppShell>
                 <div className="page-inner">
-                    {/* Page Header */}
+                    {/* Header */}
                     <div className="page-header">
                         <div className="page-header-left">
                             <h1 className="page-title">Test Cases</h1>
                             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                                {testCases.length} total &nbsp;·&nbsp;
-                                {filtered.length !== testCases.length && `${filtered.length} filtered &nbsp;·&nbsp;`}
-                                Press <kbd style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '0 4px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', color: 'var(--text-tertiary)' }}>/</kbd> to search
+                                {loading ? 'Loading cases…' : `${testCases.length} total test case${testCases.length !== 1 ? 's' : ''}`}
                             </p>
                         </div>
                         <div className="page-header-actions">
-                            <button onClick={() => setShowImportModal(true)} className="btn btn-secondary btn-sm">
+                            <button
+                                onClick={() => setShowImportModal(true)}
+                                className="btn btn-secondary btn-sm"
+                                title="Import from Excel / CSV"
+                            >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
                                 Import
                             </button>
                             <button
-                                onClick={() => handleExport(filtered)}
+                                onClick={() => handleExport(testCases)}
                                 className="btn btn-secondary btn-sm"
-                                disabled={filtered.length === 0}
+                                title="Export all test cases to Excel"
+                                disabled={testCases.length === 0}
                             >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
-                                Export XLSX
+                                Export
                             </button>
-                            <button onClick={() => setShowAIModal(true)} className="btn btn-secondary btn-sm">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                                AI Suggestions
+                            <button
+                                onClick={() => setShowAIModal(true)}
+                                className="btn btn-secondary btn-sm"
+                                title="Generate test cases with AI"
+                            >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                                AI Generate
                             </button>
-                            <button onClick={() => { setEditingTestCase(null); setShowForm(true); }} className="btn btn-primary btn-sm">
+                            <button
+                                onClick={() => { setEditingTestCase(null); setShowForm(true); }}
+                                className="btn btn-primary btn-sm"
+                            >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                                 New Test Case
                             </button>
                         </div>
                     </div>
 
-                    {/* Filter Bar */}
-                    <div className="filter-bar">
-                        <input
-                            ref={searchRef}
-                            type="text"
-                            placeholder="Search title, description, category… (/)"
-                            value={searchTerm}
-                            onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
-                            className="input-field filter-search"
-                            style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
-                        />
-                        <select
-                            value={priorityFilter}
-                            onChange={e => { setPriorityFilter(e.target.value); setPage(1); }}
-                            className="input-field filter-select"
-                            style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
-                        >
-                            <option value="All">All Priorities</option>
-                            <option value="Critical">Critical</option>
-                            <option value="High">High</option>
-                            <option value="Medium">Medium</option>
-                            <option value="Low">Low</option>
-                        </select>
-                        <select
-                            value={statusFilter}
-                            onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-                            className="input-field filter-select"
-                            style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
-                        >
-                            <option value="All">All Status</option>
-                            <option value="Pass">Pass</option>
-                            <option value="Failed">Failed</option>
-                            <option value="Pending">Pending</option>
-                            <option value="N/A">N/A</option>
-                        </select>
-                        <select
-                            value={categoryFilter}
-                            onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-                            className="input-field filter-select"
-                            style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
-                        >
-                            {categories.map(c => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
-                        </select>
-                        <select
-                            value={planFilter}
-                            onChange={e => { setPlanFilter(e.target.value); setPage(1); }}
-                            className="input-field filter-select"
-                            style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
-                        >
-                            <option value="All">All Test Plans</option>
-                            {testPlans.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                        </select>
-                        {hasFilters && (
-                            <button onClick={clearFilters} className="btn btn-ghost btn-sm" style={{ whiteSpace: 'nowrap' }}>
-                                Clear filters
-                            </button>
-                        )}
-                        <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
-                            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-                        </span>
-                    </div>
+                    {/* Filter bar */}
+                    <TestCaseFilterBar
+                        searchTerm={searchTerm}
+                        onSearchChange={(val) => { setSearchTerm(val); setPage(1); }}
+                        priorityFilter={priorityFilter}
+                        onPriorityChange={(val) => { setPriorityFilter(val); setPage(1); }}
+                        statusFilter={statusFilter}
+                        onStatusChange={(val) => { setStatusFilter(val); setPage(1); }}
+                        categoryFilter={categoryFilter}
+                        onCategoryChange={(val) => { setCategoryFilter(val); setPage(1); }}
+                        categories={categories}
+                        planFilter={planFilter}
+                        onPlanChange={(val) => { setPlanFilter(val); setPage(1); }}
+                        testPlans={testPlans}
+                        hasFilters={hasFilters}
+                        onClearFilters={clearFilters}
+                        matchedCount={filtered.length}
+                        totalCount={testCases.length}
+                    />
 
-                    {/* Bulk Action Bar */}
+                    {/* Bulk actions */}
                     {selectedIds.size > 0 && (
-                        <div className="bulk-action-bar">
-                            <span className="bulk-count">{selectedIds.size} selected</span>
-                            <button
-                                onClick={handleBulkDelete}
-                                disabled={deleting}
-                                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '3px 10px', borderRadius: 'var(--radius)', cursor: deleting ? 'not-allowed' : 'pointer', fontSize: 'var(--text-sm)', opacity: deleting ? 0.6 : 1 }}
-                            >
-                                {deleting ? 'Deleting…' : 'Delete selected'}
-                            </button>
-                            <button
-                                onClick={() => handleExport(testCases.filter(tc => selectedIds.has(tc._id)))}
-                                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '3px 10px', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
-                            >
-                                Export selected
-                            </button>
-                            <button
-                                onClick={() => setSelectedIds(new Set())}
-                                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
-                            >
-                                ✕ Clear
-                            </button>
-                        </div>
+                        <TestCaseBulkActionBar
+                            selectedCount={selectedIds.size}
+                            onExport={() => handleExport(testCases.filter((tc) => selectedIds.has(tc._id)))}
+                            onDelete={handleBulkDelete}
+                            deleting={deleting}
+                            onClearSelection={() => setSelectedIds(new Set())}
+                        />
                     )}
 
-                    {/* Data Table */}
-                    {filtered.length === 0 ? (
-                        <div className="empty-state">
+                    {/* Table View with Skeleton Loading */}
+                    {loading ? (
+                        <SkeletonTable rows={8} cols={7} />
+                    ) : testCases.length === 0 ? (
+                        <div className="empty-state panel">
                             <div className="empty-state-icon">📋</div>
-                            <div className="empty-state-title">{testCases.length === 0 ? 'No test cases yet' : 'No results match filters'}</div>
-                            <div className="empty-state-desc">
-                                {testCases.length === 0
-                                    ? 'Create your first test case or generate with AI'
-                                    : 'Try adjusting your search or filter criteria'}
+                            <div className="empty-state-title">No test cases yet</div>
+                            <div className="empty-state-desc">Create your first test case manually or generate with AI.</div>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                <button onClick={() => { setEditingTestCase(null); setShowForm(true); }} className="btn btn-primary btn-sm">
+                                    New Test Case
+                                </button>
+                                <button onClick={() => setShowAIModal(true)} className="btn btn-secondary btn-sm">
+                                    AI Generate
+                                </button>
                             </div>
-                            {testCases.length === 0 ? (
-                                <button onClick={() => setShowForm(true)} className="btn btn-primary">Create Test Case</button>
-                            ) : (
-                                <button onClick={clearFilters} className="btn btn-secondary">Clear Filters</button>
-                            )}
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="empty-state panel">
+                            <div className="empty-state-icon">🔍</div>
+                            <div className="empty-state-title">No matching test cases</div>
+                            <div className="empty-state-desc">Try clearing filters or search term.</div>
+                            <button onClick={clearFilters} className="btn btn-secondary btn-sm">
+                                Clear Filters
+                            </button>
                         </div>
                     ) : (
                         <>
@@ -407,245 +400,64 @@ const TestCases = () => {
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th style={{ width: 36, paddingLeft: 'var(--space-4)' }}>
+                                            <th style={{ width: 36 }}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={pageSlice.length > 0 && selectedIds.size === pageSlice.length}
+                                                    checked={selectedIds.size === pageSlice.length && pageSlice.length > 0}
                                                     onChange={toggleSelectAll}
+                                                    aria-label="Select all on this page"
                                                     style={{ cursor: 'pointer' }}
                                                 />
                                             </th>
-                                            <th style={{ width: 40 }}>#</th>
-                                            <th
-                                                className="sortable"
-                                                onClick={() => toggleSort('title')}
-                                                style={{ minWidth: 240 }}
-                                            >
-                                                Title <SortIcon dir={sortCol === 'title' ? sortDir : null} />
+                                            <th style={{ width: 36 }}>#</th>
+                                            <th className="sortable" onClick={() => toggleSort('title')}>
+                                                Title {sortCol === 'title' && (sortDir === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="sortable"
-                                                onClick={() => toggleSort('category')}
-                                            >
-                                                Category <SortIcon dir={sortCol === 'category' ? sortDir : null} />
+                                            <th className="sortable" style={{ width: 110 }} onClick={() => toggleSort('priority')}>
+                                                Priority {sortCol === 'priority' && (sortDir === 'asc' ? '↑' : '↓')}
                                             </th>
-                                            <th
-                                                className="sortable"
-                                                onClick={() => toggleSort('priority')}
-                                            >
-                                                Priority <SortIcon dir={sortCol === 'priority' ? sortDir : null} />
+                                            <th className="sortable" style={{ width: 110 }} onClick={() => toggleSort('executionStatus')}>
+                                                Status {sortCol === 'executionStatus' && (sortDir === 'asc' ? '↑' : '↓')}
                                             </th>
-
-                                            <th>Steps</th>
-                                            <th style={{ width: 100 }}>Actions</th>
+                                            <th style={{ width: 130 }}>Category</th>
+                                            <th style={{ width: 120 }}>In Plans</th>
+                                            <th className="col-actions-md" style={{ textAlign: 'right' }}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {pageSlice.map((tc, idx) => (
-                                            // The fragment is the list child, so the key belongs here.
-                                            // Shorthand <> cannot take one, which is why React warned and
-                                            // why rows were reconciled by position — filtering or sorting
-                                            // could leave the expanded detail attached to the wrong row.
-                                            <Fragment key={tc._id}>
-                                                <tr
-                                                    className={selectedIds.has(tc._id) ? 'row-selected' : ''}
-                                                    onClick={() => setExpandedRow(expandedRow === tc._id ? null : tc._id)}
-                                                >
-                                                    <td style={{ paddingLeft: 'var(--space-4)' }} onClick={e => e.stopPropagation()}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedIds.has(tc._id)}
-                                                            onChange={() => toggleSelect(tc._id)}
-                                                            style={{ cursor: 'pointer' }}
-                                                        />
-                                                    </td>
-                                                    <td style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>
-                                                        {(page - 1) * ITEMS_PER_PAGE + idx + 1}
-                                                    </td>
-                                                    <td>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                                            <span style={{ color: 'var(--text-tertiary)', lineHeight: 0 }}>
-                                                                {expandedRow === tc._id ? <ChevronDown /> : <ChevronRight />}
-                                                            </span>
-                                                            <div>
-                                                                <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{tc.title}</div>
-                                                                {tc.description && (
-                                                                    <div className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', maxWidth: 300 }}>
-                                                                        {tc.description}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.category || '—'}</td>
-                                                    <td><StatusTag status={tc.priority || 'Medium'} /></td>
-
-                                                    <td style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                                                        {tc.steps?.length || 0}
-                                                    </td>
-                                                    <td onClick={e => e.stopPropagation()}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                            <button
-                                                                onClick={() => { setEditingTestCase(tc); setShowForm(true); }}
-                                                                className="btn btn-ghost btn-icon"
-                                                                title="Edit"
-                                                                style={{ color: 'var(--brand)' }}
-                                                            >
-                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleImprove(tc)}
-                                                                className="btn btn-ghost btn-icon"
-                                                                title="AI Improve"
-                                                                disabled={improvingId === tc._id}
-                                                                style={{ color: 'var(--status-blocked)' }}
-                                                            >
-                                                                {improvingId === tc._id
-                                                                    ? <div className="spinner" style={{ width: 11, height: 11 }} />
-                                                                    : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                                                                }
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(tc._id)}
-                                                                className="btn btn-ghost btn-icon"
-                                                                title="Delete"
-                                                                disabled={deleting}
-                                                                style={{ color: 'var(--status-fail)', opacity: deleting ? 0.4 : 1 }}
-                                                            >
-                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" /></svg>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-
-                                                {/* Expanded detail row */}
-                                                {expandedRow === tc._id && (
-                                                    <tr key={`${tc._id}-detail`} className="row-detail">
-                                                        <td colSpan={8}>
-                                                            {tc.externalId && (
-                                                                <div style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                                                                    ID: {tc.externalId}
-                                                                </div>
-                                                            )}
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
-                                                                <div>
-                                                                    <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Description</div>
-                                                                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                                                                        {tc.description || <em style={{ color: 'var(--text-tertiary)' }}>No description</em>}
-                                                                    </p>
-                                                                    {tc.preCondition && (
-                                                                        <>
-                                                                            <div className="section-label" style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>Pre-condition</div>
-                                                                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{tc.preCondition}</p>
-                                                                        </>
-                                                                    )}
-                                                                    {tc.testData && (
-                                                                        <>
-                                                                            <div className="section-label" style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>Test Data</div>
-                                                                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{tc.testData}</p>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                                {tc.steps?.length > 0 && (
-                                                                    <div>
-                                                                        <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Test Steps ({tc.steps.length})</div>
-                                                                        <div className="step-list">
-                                                                            {tc.steps.map((step, i) => (
-                                                                                <div key={i} className="step-item">
-                                                                                    <span className="step-number">{step.stepNumber}</span>
-                                                                                    <div className="step-body">
-                                                                                        <div className="step-action">{step.action}</div>
-                                                                                        {step.expectedResult && (
-                                                                                            <div className="step-expected">{step.expectedResult}</div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            {tc.executionNotes && (
-                                                                <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--brand-light)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--brand)' }}>
-                                                                    <span className="section-label">Execution Notes: </span>
-                                                                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.executionNotes}</span>
-                                                                </div>
-                                                            )}
-                                                            {tc.executedBy && (
-                                                                <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                                                                    Executed by <strong style={{ color: 'var(--text-secondary)' }}>{tc.executedBy.name || tc.executedBy.email}</strong>
-                                                                    {tc.executedAt && ` on ${fmtDateTime(tc.executedAt)}`}
-                                                                </div>
-                                                            )}
-                                                            <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                                                                In Test Plans:{' '}
-                                                                {(tcToPlans[tc._id] || []).length === 0 ? (
-                                                                    <em>none</em>
-                                                                ) : (
-                                                                    (tcToPlans[tc._id] || []).map((plan, i) => (
-                                                                        <span key={plan._id}>
-                                                                            {i > 0 && ', '}
-                                                                            <a
-                                                                                href="#"
-                                                                                onClick={(e) => {
-                                                                                    e.preventDefault();
-                                                                                    e.stopPropagation();
-                                                                                    navigate('/testplans', { state: { selectPlanId: plan._id, selectTCId: tc._id } });
-                                                                                }}
-                                                                                style={{ color: 'var(--brand)' }}
-                                                                            >
-                                                                                {plan.name}
-                                                                            </a>
-                                                                        </span>
-                                                                    ))
-                                                                )}
-                                                            </div>
-                                                            {(tc.bugType || tc.bugSeverity || tc.fixStatus || tc.bugId) && (
-                                                                <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--status-fail-bg)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--status-fail)' }}>
-                                                                    <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>Bug Details</div>
-                                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                                                                        {tc.bugType && <span><strong>Type:</strong> {tc.bugType}</span>}
-                                                                        {tc.bugSeverity && <span><strong>Severity:</strong> {tc.bugSeverity}</span>}
-                                                                        {tc.fixStatus && <span><strong>Fix Status:</strong> {tc.fixStatus}</span>}
-                                                                        {tc.bugId && <span><strong>Bug ID:</strong> {tc.bugId}</span>}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            <div style={{ marginTop: 'var(--space-4)' }}>
-                                                                <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>History</div>
-                                                                <ActivityHistory historyFn={testCasesAPI.getHistory} entityId={tc._id} refreshToken={historyRefresh} />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </Fragment>
+                                            <TestCaseTableRow
+                                                key={tc._id}
+                                                tc={tc}
+                                                index={(page - 1) * ITEMS_PER_PAGE + idx + 1}
+                                                isSelected={selectedIds.has(tc._id)}
+                                                isExpanded={expandedRow === tc._id}
+                                                onToggleSelect={() => toggleSelect(tc._id)}
+                                                onToggleExpand={() => setExpandedRow(expandedRow === tc._id ? null : tc._id)}
+                                                onEdit={() => { setEditingTestCase(tc); setShowForm(true); }}
+                                                onImprove={() => handleImprove(tc)}
+                                                onDelete={() => handleDelete(tc._id, tc.title)}
+                                                improvingId={improvingId}
+                                                deleting={deleting}
+                                                plans={tcToPlans[tc._id] || []}
+                                                historyRefresh={historyRefresh}
+                                                onNavigateToPlan={(planId, tcId) => {
+                                                    navigate('/testplans', { state: { selectPlanId: planId, selectTCId: tcId } });
+                                                }}
+                                            />
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
 
                             {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-4)' }}>
-                                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                                        Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, sorted.length)} of {sorted.length}
-                                    </span>
-                                    <div className="pagination">
-                                        <button className="pag-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
-                                        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                                            const p = totalPages <= 7 ? i + 1 : i === 0 ? 1 : i === 6 ? totalPages : page - 2 + i;
-                                            return (
-                                                <button
-                                                    key={p}
-                                                    className={`pag-btn${page === p ? ' pag-active' : ''}`}
-                                                    onClick={() => setPage(p)}
-                                                >{p}</button>
-                                            );
-                                        })}
-                                        <button className="pag-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
-                                    </div>
-                                </div>
-                            )}
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                totalItems={sorted.length}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                                onPageChange={(newPage) => setPage(newPage)}
+                            />
                         </>
                     )}
                 </div>
@@ -660,6 +472,19 @@ const TestCases = () => {
                 {showImportModal && (
                     <ImportTestCaseModal onClose={() => setShowImportModal(false)} onImportComplete={fetchTestCases} />
                 )}
+
+                {/* Confirm Dialog */}
+                <ConfirmDialog
+                    isOpen={confirmDialog.isOpen}
+                    title={confirmDialog.title}
+                    message={confirmDialog.message}
+                    confirmText={confirmDialog.confirmText}
+                    cancelText={confirmDialog.cancelText}
+                    variant={confirmDialog.variant}
+                    loading={deleting}
+                    onConfirm={confirmDialog.onConfirm}
+                    onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+                />
             </AppShell>
         </>
     );

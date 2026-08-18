@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useAuth } from '../contexts/AuthContext';
 import { workspacesAPI } from '../services/api';
+import ConfirmDialog from './common/ConfirmDialog';
 
 const IconChevronDown = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -109,24 +110,69 @@ const WorkspaceSelector = () => {
 
     const isOwner = activeWorkspace && user && (activeWorkspace.createdBy?._id || activeWorkspace.createdBy) === user._id;
 
-    const handleRemoveMember = async (member) => {
-        if (!confirm(`Remove ${member.name || member.email} from ${activeWorkspace.name}?`)) return;
-        try {
-            await workspacesAPI.removeMember(activeWorkspace._id, member._id);
-            await fetchWorkspaces();
-        } catch (err) {
-            alert(err.response?.data?.message || 'Failed to remove member');
-        }
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        confirmText: 'Confirm',
+        cancelText: 'Cancel',
+        variant: 'danger',
+        onConfirm: null,
+    });
+
+    // Escape listener for modals
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && !isLoading) {
+                if (isCreateModalOpen) setIsCreateModalOpen(false);
+                if (isInviteModalOpen) setIsInviteModalOpen(false);
+                if (isDropdownOpen) setIsDropdownOpen(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isCreateModalOpen, isInviteModalOpen, isDropdownOpen, isLoading]);
+
+    const handleRemoveMember = (member) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Remove Team Member',
+            message: `Remove ${member.name || member.email} from "${activeWorkspace.name}"? They will lose access immediately.`,
+            confirmText: 'Remove Member',
+            cancelText: 'Cancel',
+            variant: 'danger',
+            onConfirm: async () => {
+                try {
+                    await workspacesAPI.removeMember(activeWorkspace._id, member._id);
+                    await fetchWorkspaces();
+                } catch (err) {
+                    console.error('Failed to remove member:', err);
+                } finally {
+                    setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+                }
+            },
+        });
     };
 
-    const handleLeaveWorkspace = async () => {
-        if (!confirm(`Leave ${activeWorkspace.name}? You'll lose access to its test cases and test plans.`)) return;
-        try {
-            await workspacesAPI.leave(activeWorkspace._id);
-            await fetchWorkspaces();
-        } catch (err) {
-            alert(err.response?.data?.message || 'Failed to leave workspace');
-        }
+    const handleLeaveWorkspace = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Leave Workspace',
+            message: `Leave "${activeWorkspace.name}"? You will immediately lose access to all its test cases and test plans.`,
+            confirmText: 'Leave Workspace',
+            cancelText: 'Cancel',
+            variant: 'danger',
+            onConfirm: async () => {
+                try {
+                    await workspacesAPI.leave(activeWorkspace._id);
+                    await fetchWorkspaces();
+                } catch (err) {
+                    console.error('Failed to leave workspace:', err);
+                } finally {
+                    setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+                }
+            },
+        });
     };
 
     const handleCreateWorkspace = async (e) => {
@@ -402,7 +448,19 @@ const WorkspaceSelector = () => {
                     document.body
                 )
             }
-        </div >
+
+            {/* Confirm Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                confirmText={confirmDialog.confirmText}
+                cancelText={confirmDialog.cancelText}
+                variant={confirmDialog.variant}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+            />
+        </div>
     );
 };
 

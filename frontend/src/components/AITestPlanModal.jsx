@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { aiAPI, testCasesAPI, testPlansAPI } from '../services/api';
 import { useToast, ToastContainer } from './Toast';
 
@@ -8,6 +8,16 @@ const AITestPlanModal = ({ onClose, onTestPlanCreated }) => {
     const [loading, setLoading] = useState(false);
     const [expandedScenarios, setExpandedScenarios] = useState(new Set());
     const toast = useToast();
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && !loading) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, loading]);
 
     const handleGenerate = async () => {
         if (!projectDescription.trim()) {
