@@ -45,6 +45,16 @@ const TestCaseForm = ({ testCase, onClose }) => {
         }
     }, [testCase]);
 
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && !loading) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, loading]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);

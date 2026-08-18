@@ -35,14 +35,19 @@ TestCase
 - WHEN người dùng lọc THE SYSTEM SHALL cho lọc theo priority/status/category, và sắp xếp theo bất kỳ cột nào.
 - WHEN người dùng chọn nhiều dòng và bấm xoá THE SYSTEM SHALL cho phép batch delete.
 
-### US-4: Là người dùng, tôi muốn việc xoá test case tự động dọn dẹp trong các test plan liên quan.
+### US-4: Là người dùng, tôi muốn việc xoá test case tự động dọn dẹp trong các test plan liên quan trong cùng workspace.
 
-- WHEN một test case bị xoá THE SYSTEM SHALL tự động gỡ nó khỏi mọi test plan đang tham chiếu.
+- WHEN một test case bị xoá (đơn lẻ hoặc batch delete) THE SYSTEM SHALL tự động dọn dẹp tham chiếu trong mọi test plan thuộc workspace (hoặc user cá nhân) tương ứng, và kích hoạt tính lại trạng thái tự động của plan đó.
 - WHEN một plan không còn test case nào sau khi xoá THE SYSTEM SHALL tự động đánh dấu plan đó là `Obsolete`.
 
 ### US-5: Là người dùng, tôi muốn thao tác xoá bị giới hạn tần suất.
 
-- WHEN người dùng gọi DELETE/batch-delete test case quá 10 lần trong 10 giây THE SYSTEM SHALL chặn request vượt ngưỡng.
+- WHEN người dùng gọi DELETE/batch-delete test case quá 10 lần trong 10 giây THE SYSTEM SHALL chặn request vượt ngưỡng (HTTP 429).
+
+### US-6: Là người dùng, tôi muốn xem danh sách test case có hỗ trợ phân trang phía server.
+
+- WHEN client gửi request kèm query params `page` và `limit` THE SYSTEM SHALL trả về tập dữ liệu phân trang cùng metadata `{ total, page, limit, totalPages, hasMore }`.
+- WHEN client không gửi params phân trang THE SYSTEM SHALL trả về toàn bộ danh sách để đảm bảo tương thích ngược.
 
 ## Nguồn
 

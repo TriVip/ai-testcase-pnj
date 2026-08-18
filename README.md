@@ -1,50 +1,63 @@
-# AI Test Case Generator 🚀
+# AI Test Case Generator (QA Manager) 🚀
 
-A full-stack AI-powered test case and test plan management system with Google OAuth authentication and OpenAI integration.
+A comprehensive, full-stack AI-powered test case and test plan management platform built for modern QA and engineering teams. Features real-time collaboration, workspace data isolation, bug tracking, AI-assisted authoring, and Excel/CSV import/export.
+
+---
 
 ## Features ✨
 
-- 🔐 **Google OAuth Authentication** - Secure login with Gmail
-- 📝 **Test Case Management** - Create, edit, delete, and organize test cases
-- 📋 **Test Plan Management** - Group test cases into comprehensive test plans
-- 🤖 **AI-Powered Suggestions** - Generate test cases automatically using OpenAI
-- 📊 **XLSX Export** - Export test cases to Excel format
-- 🎨 **Modern UI** - Beautiful interface built with Tailwind CSS
+- 🔐 **Secure Authentication** — Username/email & password login with bcrypt hashing (12 rounds) and JWT in `httpOnly` secure cookies.
+- 🏢 **Multi-Tenant Workspaces** — Personal and team workspaces with strict member-level authorization and anti-IDOR isolation.
+- 📝 **Test Case Management** — Rich test cases with preconditions, test data, ordered steps, priority, category, feature modules, tags, execution attribution, and server-side pagination.
+- 📋 **Test Plan Management** — Group test cases into structured plans with natural-order module categorization, progress KPI bars, and deep-linking navigation.
+- 🔄 **Plan Status Auto-Sync** — Real-time auto-computation of plan pass/fail status derived from test cases' bug tracking resolution (veto rule).
+- 🐛 **Integrated Bug Tracking** — Log defect types, severity, fix status, and bug IDs directly on failed test cases, aggregated in a dedicated Bug Tracking view.
+- 🤖 **AI-Powered Generation** — Generate comprehensive test cases from descriptions or uploaded documents (TXT/PDF/DOCX), suggest complete test plans, and improve existing test cases using OpenAI.
+- ⚡ **Real-Time Updates** — Live status synchronization across active teammates via authenticated Socket.io rooms.
+- 📊 **Excel & CSV Import/Export** — Import spreadsheets with validation against a pre-built downloadable template, with client-side XLSX export.
+- 🎨 **Enterprise Design System** — Data-dense, power-user UI supporting light & dark themes with keyboard shortcuts (`Cmd/Ctrl + 1-5`, `/` for search).
+- 🧪 **Automated Test Suite** — Fast unit and integration tests covering authentication, workspace scoping, model constraints, rate limiting, and business logic.
+
+---
 
 ## Tech Stack 💻
 
 ### Frontend
-- **Vite** - Fast build tool
-- **React** - UI library
-- **Tailwind CSS** - Utility-first CSS framework
-- **React Router** - Client-side routing
-- **Axios** - HTTP client
-- **XLSX** - Excel file generation
+- **React 18** — Component-based UI library
+- **Vite 7** — High-speed build tool and dev server
+- **React Router 7** — Client-side SPA routing with deep-state navigation
+- **Tailwind CSS & CSS Custom Properties** — Modular design system with dark mode
+- **Socket.io Client** — Real-time event streaming
+- **Axios** — HTTP client with automated workspace recovery interceptors
+- **ExcelJS** — In-browser spreadsheet generation
 
 ### Backend
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **MongoDB** - Database
-- **Mongoose** - ODM for MongoDB
-- **Passport.js** - Authentication middleware
-- **OpenAI API** - AI-powered suggestions
-- **JWT** - Token-based authentication
+- **Node.js (ESM)** — Runtime environment (>= 18.0.0)
+- **Express.js 4** — REST API framework
+- **MongoDB & Mongoose 8** — Database and ODM with automated indexing & enum handling
+- **Socket.io 4** — Authenticated WebSocket rooms
+- **OpenAI API** — AI generation engine (`gpt-3.5-turbo` / configurable)
+- **Bcrypt.js** — Salted password hashing with legacy migration
+- **Helmet & Rate Limiting** — Security headers and per-identity rate limiting
+
+---
 
 ## Prerequisites 📋
 
-- Node.js >= 18.0.0
-- npm >= 9.0.0
-- MongoDB (local or Atlas)
-- Google OAuth credentials
-- OpenAI API key
+- **Node.js** >= 18.0.0
+- **npm** >= 9.0.0
+- **MongoDB** (Local instance or MongoDB Atlas cluster)
+- **OpenAI API Key** (from [OpenAI Platform](https://platform.openai.com/))
+
+---
 
 ## Setup Instructions 🛠️
 
-### 1. Clone and Install
+### 1. Clone & Install Dependencies
 
 ```bash
 cd ai-testcase-gen
-npm install
+npm run install:all
 ```
 
 ### 2. Configure Environment Variables
@@ -55,107 +68,132 @@ Copy `.env.example` to `.env` in the root directory:
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your credentials:
+Configure your variables in `.env`:
 
-- **MongoDB URI**: Your MongoDB connection string
-- **Google OAuth**: Client ID and Secret from [Google Cloud Console](https://console.cloud.google.com/)
-- **OpenAI API Key**: From [OpenAI Platform](https://platform.openai.com/)
-- **JWT Secret**: Generate a random secure string
+```env
+# Server Configuration
+PORT=9999
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
 
-### 3. Setup Google OAuth
+# Database Connection (Local MongoDB or Atlas URI)
+MONGODB_URI=mongodb://localhost:27017/testcase-gen
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
-3. Enable Google+ API
-4. Go to Credentials → Create Credentials → OAuth 2.0 Client ID
-5. Add authorized redirect URI: `http://localhost:5000/api/auth/google/callback`
-6. Copy Client ID and Client Secret to `.env`
+# JWT Secret (Must be >= 32 characters of random data)
+# Generate with: openssl rand -base64 48
+JWT_SECRET=your-secure-random-jwt-secret-min-32-chars-length
 
-### 4. Setup MongoDB
+# OpenAI API Key
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-3.5-turbo
 
-**Option A: MongoDB Atlas (Recommended)**
-1. Create free account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-2. Create a cluster
-3. Get connection string and add to `.env`
+# Session Cookie Setting
+# Set to 'false' only for plain HTTP deployments without TLS (e.g. bare EC2 IP)
+COOKIE_SECURE=true
+```
 
-**Option B: Local MongoDB**
-1. Install MongoDB locally
-2. Start MongoDB service
-3. Use `mongodb://localhost:27017/testcase-gen` in `.env`
-
-### 5. Run the Application
+### 3. Run the Application
 
 ```bash
-# Run both frontend and backend
+# Run both frontend (5173) and backend (9999) concurrently
 npm run dev
 
-# Or run separately
-npm run dev:backend  # Backend on http://localhost:5000
-npm run dev:frontend # Frontend on http://localhost:5173
+# Or run individually:
+npm run dev:backend   # API server on http://localhost:9999
+npm run dev:frontend  # Vite dev server on http://localhost:5173
 ```
+
+---
+
+## Running Tests 🧪
+
+Execute the backend automated test suite:
+
+```bash
+npm test
+```
+
+Build and validate the frontend production bundle:
+
+```bash
+cd frontend && npm run build
+```
+
+---
 
 ## Project Structure 📁
 
 ```
 ai-testcase-gen/
-├── frontend/          # Vite + React + Tailwind
+├── frontend/                     # React 18 + Vite SPA
 │   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── contexts/
-│   │   ├── services/
-│   │   └── utils/
+│   │   ├── components/           # UI components & forms
+│   │   │   ├── common/           # Shared components (Pagination, etc.)
+│   │   │   ├── testcases/        # Modular test case table, row, filters
+│   │   │   ├── testplans/        # Modular plan tree & detail panels
+│   │   ├── contexts/             # AuthContext, WorkspaceContext
+│   │   ├── pages/                # Dashboard, TestCases, TestPlans, BugTracking, Automation, Login
+│   │   ├── services/             # Axios API client & Socket.io
+│   │   └── utils/                # XLSX export & lookup helpers
 │   └── package.json
-├── backend/           # Express.js + MongoDB
+├── backend/                      # Express.js REST API & WebSocket Server
 │   ├── src/
-│   │   ├── models/
-│   │   ├── routes/
-│   │   ├── middleware/
-│   │   ├── services/
-│   │   └── config/
+│   │   ├── config/               # Database connection
+│   │   ├── middleware/           # Auth verification & rate limiter
+│   │   ├── models/               # User, Workspace, TestCase, TestPlan, ActivityLog
+│   │   ├── routes/               # Auth, TestCases, TestPlans, AI, Workspaces
+│   │   ├── services/             # OpenAI service integration
+│   │   └── utils/                # Workspace scoping, plan sync, import utils
+│   ├── tests/                    # Automated Node.js test suite
 │   └── package.json
-├── shared/            # Shared types and utilities
-└── package.json       # Root workspace config
+├── shared/                       # Shared type definitions
+├── docs/                         # Specifications & technical documentation
+├── docker-compose.yml            # Docker container deployment configuration
+└── package.json                  # Root npm workspace configuration
 ```
 
-## API Endpoints 🔌
+---
+
+## Key API Endpoints 🔌
 
 ### Authentication
-- `GET /api/auth/google` - Initiate Google OAuth
-- `GET /api/auth/google/callback` - OAuth callback
-- `GET /api/auth/logout` - Logout user
-- `GET /api/auth/current` - Get current user
+- `POST /api/auth/register` — Register new user and initialize personal workspace
+- `POST /api/auth/login` — Login user with password verification & issue httpOnly cookie
+- `GET /api/auth/current` — Get currently authenticated user profile
+- `POST /api/auth/logout` — Clear session cookie
+
+### Workspaces
+- `GET /api/workspaces` — List workspaces accessible by the user
+- `POST /api/workspaces` — Create a new team workspace
+- `POST /api/workspaces/:id/invite` — Invite a member by email (owner only)
+- `DELETE /api/workspaces/:id/members/:userId` — Remove member (owner only)
+- `POST /api/workspaces/:id/leave` — Leave workspace
 
 ### Test Cases
-- `GET /api/testcases` - Get all test cases
-- `POST /api/testcases` - Create test case
-- `GET /api/testcases/:id` - Get single test case
-- `PUT /api/testcases/:id` - Update test case
-- `DELETE /api/testcases/:id` - Delete test case
+- `GET /api/testcases?page=1&limit=25` — Get test cases (supports server-side pagination & filtering)
+- `POST /api/testcases` — Create a test case
+- `GET /api/testcases/:id` — Get single test case with execution attribution
+- `PUT /api/testcases/:id` — Update test case or execution status / bug fields
+- `DELETE /api/testcases/:id` — Delete test case & auto-cleanup plan references
+- `POST /api/testcases/batch-delete` — Batch delete test cases (max 50) with workspace-scoped plan cleanup
+- `POST /api/testcases/import` — Multipart XLSX/CSV import
+- `GET /api/testcases/template` — Download standard XLSX/CSV import template
+- `GET /api/testcases/:id/history` — Get activity audit trail
 
 ### Test Plans
-- `GET /api/testplans` - Get all test plans
-- `POST /api/testplans` - Create test plan
-- `GET /api/testplans/:id` - Get single test plan
-- `PUT /api/testplans/:id` - Update test plan
-- `DELETE /api/testplans/:id` - Delete test plan
+- `GET /api/testplans?page=1&limit=25` — Get test plans (supports server-side pagination & filtering)
+- `POST /api/testplans` — Create test plan
+- `GET /api/testplans/:id` — Get single plan with populated test cases
+- `PUT /api/testplans/:id` — Update test plan or execution status
+- `DELETE /api/testplans/:id` — Delete test plan
+- `GET /api/testplans/:id/history` — Get plan activity audit trail
 
-### AI
-- `POST /api/ai/suggest-testcases` - Generate AI test case suggestions
+### AI Authoring
+- `POST /api/ai/suggest-testcases` — Generate test cases from prompt or document
+- `POST /api/ai/suggest-testplan` — Generate full modular test plan
+- `POST /api/ai/improve-testcase` — Review and enhance existing test case
 
-## Development 👨‍💻
-
-```bash
-# Install dependencies for all workspaces
-npm run install:all
-
-# Run development servers
-npm run dev
-
-# Access the application
-# Frontend: http://localhost:5173
-# Backend: http://localhost:5000
-```
+---
 
 ## License 📄
 

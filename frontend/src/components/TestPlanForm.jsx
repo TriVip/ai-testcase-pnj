@@ -27,6 +27,16 @@ const TestPlanForm = ({ testPlan, onClose }) => {
         }
     }, [testPlan]);
 
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && !loading) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, loading]);
+
     const fetchTestCases = async () => {
         try {
             const response = await testCasesAPI.getAll();

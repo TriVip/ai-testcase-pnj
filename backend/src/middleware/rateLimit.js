@@ -24,7 +24,7 @@ setInterval(() => {
             stores.delete(key);
         }
     }
-}, 60_000);
+}, 60_000).unref();
 
 /**
  * @param {Object} options

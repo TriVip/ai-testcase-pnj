@@ -140,35 +140,56 @@ html.dark {
     --border-subtle: #21262d;
     --border-strong: #484f58;
 
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --text-tertiary: #484f58;
+    --text-primary: #f0f6fc;
+    --text-secondary: #c9d1d9;
+    --text-tertiary: #8b949e;
     --text-on-sidebar: #8b949e;
-    --text-on-sidebar-active: #e6edf3;
+    --text-on-sidebar-active: #f0f6fc;
 
     --brand: #388bfd;
     --brand-hover: #58a6ff;
     --brand-light: #0d2137;
     --brand-muted: #1f3c5c;
 
-    /* Status colors adjust slightly for dark */
+    /* Status colors adjust for high contrast in dark */
     --status-pass-bg: #0f2f1a;
     --status-pass-border: #2d6a3f;
+    --status-pass-text: #4ade80;
+
     --status-fail-bg: #2d1216;
     --status-fail-border: #6e2323;
+    --status-fail-text: #f87171;
+
     --status-pending-bg: #1c2128;
     --status-pending-border: #30363d;
+    --status-pending-text: #9ca3af;
+
     --status-blocked-bg: #1c1030;
     --status-blocked-border: #6e3fa0;
+    --status-blocked-text: #c084fc;
+
     --status-warn-bg: #2a1c04;
     --status-warn-border: #7a4e0b;
+    --status-warn-text: #fbbf24;
 
     --prio-critical-bg: #2a0a0a;
+    --prio-critical-text: #f87171;
+
     --prio-high-bg: #1f1208;
+    --prio-high-text: #fb923c;
+
     --prio-medium-bg: #1c1a04;
+    --prio-medium-text: #facc15;
+
     --prio-low-bg: #1c2128;
+    --prio-low-text: #94a3b8;
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow: 0 4px 8px -2px rgb(0 0 0 / 0.4);
     --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.5);
+}
+
+/* Sidebar collapsed modifier */
+html.sidebar-collapsed {
+    --sidebar-width: 56px;
 }
