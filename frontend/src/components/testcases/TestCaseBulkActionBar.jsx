@@ -1,10 +1,12 @@
 import React from 'react';
+import { PROJECTS } from '../../constants/projects';
 
 const TestCaseBulkActionBar = ({
     selectedCount,
     deleting,
     onBulkDelete,
     onBulkExport,
+    onBulkAssign,
     onClearSelection,
 }) => {
     if (selectedCount === 0) return null;
@@ -42,6 +44,26 @@ const TestCaseBulkActionBar = ({
             >
                 Export selected
             </button>
+            <select
+                value=""
+                onChange={(e) => onBulkAssign(e.target.value === '__none__' ? '' : e.target.value)}
+                aria-label="Move selected to project"
+                style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: 'white',
+                    padding: '3px 10px',
+                    borderRadius: 'var(--radius)',
+                    cursor: 'pointer',
+                    fontSize: 'var(--text-sm)',
+                }}
+            >
+                <option value="" disabled>Move to project…</option>
+                {PROJECTS.map((p) => (
+                    <option key={p} value={p} style={{ color: 'initial' }}>{p}</option>
+                ))}
+                <option value="__none__" style={{ color: 'initial' }}>Unassigned</option>
+            </select>
             <button
                 onClick={onClearSelection}
                 style={{
