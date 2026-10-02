@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { PROJECTS } from '../constants/projects.js';
 
 // Column layout shared by the XLSX and CSV templates. `width` is only used by
 // the XLSX sheet; the CSV ignores it.
@@ -9,6 +10,7 @@ import ExcelJS from 'exceljs';
 // like that one can bring it in without reshaping their data by hand.
 const COLUMNS = [
     { header: 'ID', width: 12 },
+    { header: 'Project', width: 16 },
     { header: 'Feature', width: 26 },
     { header: 'Descriptions', width: 40 },
     { header: 'Pre-condition', width: 32 },
@@ -28,6 +30,7 @@ const COLUMNS = [
 // COLUMNS' order below rather than hardcoded, so reordering COLUMNS can't
 // silently point a dropdown at the wrong column.
 const DROPDOWNS = {
+    'Project': PROJECTS,
     'Trạng thái': ['PASS', 'FAIL', 'UNTESTED', 'N/A'],
     'Phân loại lỗi': ['Bug', 'Đề xuất'],
     'Mức độ lỗi': ['High', 'Medium', 'Low'],
@@ -40,6 +43,7 @@ const DROPDOWNS = {
 const SAMPLE_ROWS = [
     {
         'ID': 'TC-001',
+        'Project': 'Website',
         'Feature': 'User Login',
         'Descriptions': 'Login succeeds with a valid username and password',
         'Pre-condition': 'Account already registered; browser is on the login page',
@@ -55,6 +59,7 @@ const SAMPLE_ROWS = [
     },
     {
         'ID': 'TC-002',
+        'Project': 'Website',
         'Feature': 'User Login',
         'Descriptions': 'An error message is shown when the password is wrong',
         'Pre-condition': 'Account already registered; browser is on the login page',

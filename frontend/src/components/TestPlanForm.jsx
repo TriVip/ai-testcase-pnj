@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { testPlansAPI, testCasesAPI } from '../services/api';
+import { PROJECTS } from '../constants/projects';
+
+const UNASSIGNED = '__none__';
 
 const TestPlanForm = ({ testPlan, onClose }) => {
     const [formData, setFormData] = useState({
@@ -12,6 +15,11 @@ const TestPlanForm = ({ testPlan, onClose }) => {
     });
     const [availableTestCases, setAvailableTestCases] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [search, setSearch] = useState('');
+    const [projectFilter, setProjectFilter] = useState('All');
+    const [featureFilter, setFeatureFilter] = useState('All');
+    const [priorityFilter, setPriorityFilter] = useState('All');
+    const [selectedOnly, setSelectedOnly] = useState(false);
 
     useEffect(() => {
         fetchTestCases();
@@ -74,15 +82,31 @@ const TestPlanForm = ({ testPlan, onClose }) => {
         });
     };
 
-    const allSelected = availableTestCases.length > 0 && availableTestCases.every(tc => formData.testCases.includes(tc._id));
+    const features = [...new Set(availableTestCases.map(tc => tc.feature).filter(Boolean))].sort();
+    const term = search.trim().toLowerCase();
+    const visible = availableTestCases.filter(tc =>
+        (!term || [tc.title, tc.description, tc.externalId, tc.feature].some(v => v?.toLowerCase().includes(term))) &&
+        (projectFilter === 'All' || (projectFilter === UNASSIGNED ? !tc.project : tc.project === projectFilter)) &&
+        (featureFilter === 'All' || tc.feature === featureFilter) &&
+        (priorityFilter === 'All' || tc.priority === priorityFilter) &&
+        (!selectedOnly || formData.testCases.includes(tc._id))
+    );
+
+    // Select All / Deselect All act on the filtered list only; selections
+    // hidden by the current filters are kept.
+    const allSelected = visible.length > 0 && visible.every(tc => formData.testCases.includes(tc._id));
 
     const toggleSelectAll = () => {
-        if (allSelected) {
-            setFormData({ ...formData, testCases: [] });
-        } else {
-            setFormData({ ...formData, testCases: availableTestCases.map(tc => tc._id) });
-        }
+        const visibleIds = new Set(visible.map(tc => tc._id));
+        setFormData({
+            ...formData,
+            testCases: allSelected
+                ? formData.testCases.filter(id => !visibleIds.has(id))
+                : [...new Set([...formData.testCases, ...visibleIds])],
+        });
     };
+
+    const filterStyle = { padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--text-sm)' };
 
     return (
         <div
@@ -176,22 +200,57 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                                 <label className="form-label" style={{ margin: 0 }}>
                                     Test Cases ({formData.testCases.length} selected)
                                 </label>
-                                {availableTestCases.length > 0 && (
+                                {visible.length > 0 && (
                                     <button
                                         type="button"
                                         onClick={toggleSelectAll}
                                         className="btn btn-ghost btn-sm"
                                         style={{ fontSize: 'var(--text-xs)', padding: '4px 10px' }}
                                     >
-                                        {allSelected ? 'Deselect All' : 'Select All'}
+                                        {allSelected ? 'Deselect' : 'Select'} {visible.length === availableTestCases.length ? 'All' : `${visible.length} shown`}
                                     </button>
                                 )}
                             </div>
                             {availableTestCases.length === 0 ? (
                                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No test cases available. Create some test cases first.</p>
                             ) : (
+                                <>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', alignItems: 'center' }}>
+                                    <input
+                                        type="search"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search title, ID, feature…"
+                                        aria-label="Search test cases"
+                                        className="input-field"
+                                        style={{ ...filterStyle, flex: '1 1 180px' }}
+                                    />
+                                    <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} aria-label="Filter by project" className="input-field" style={{ ...filterStyle, width: 'auto' }}>
+                                        <option value="All">All Projects</option>
+                                        {PROJECTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                        <option value={UNASSIGNED}>Unassigned</option>
+                                    </select>
+                                    <select value={featureFilter} onChange={(e) => setFeatureFilter(e.target.value)} aria-label="Filter by feature" className="input-field" style={{ ...filterStyle, width: 'auto' }}>
+                                        <option value="All">All Features</option>
+                                        {features.map(f => <option key={f} value={f}>{f}</option>)}
+                                    </select>
+                                    <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} aria-label="Filter by priority" className="input-field" style={{ ...filterStyle, width: 'auto' }}>
+                                        <option value="All">All Priorities</option>
+                                        <option>Critical</option>
+                                        <option>High</option>
+                                        <option>Medium</option>
+                                        <option>Low</option>
+                                    </select>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                                        <input type="checkbox" checked={selectedOnly} onChange={(e) => setSelectedOnly(e.target.checked)} />
+                                        Selected only
+                                    </label>
+                                </div>
                                 <div style={{ background: 'var(--bg-surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: 'var(--space-2)', maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    {availableTestCases.map((tc) => (
+                                    {visible.length === 0 && (
+                                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', padding: 'var(--space-2) var(--space-3)' }}>No test cases match these filters.</p>
+                                    )}
+                                    {visible.map((tc) => (
                                         <label
                                             key={tc._id}
                                             style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'background var(--transition)' }}
@@ -208,12 +267,15 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                                                 <p style={{ fontWeight: 500, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{tc.title}</p>
                                                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 3, alignItems: 'center' }}>
                                                     <span className={`status-tag prio-${tc.priority?.toLowerCase()}`}>{tc.priority}</span>
-                                                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{tc.category}</span>
+                                                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>{tc.project || 'Unassigned'}</span>
+                                                    {tc.feature && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>· {tc.feature}</span>}
+                                                    {tc.externalId && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>· {tc.externalId}</span>}
                                                 </div>
                                             </div>
                                         </label>
                                     ))}
                                 </div>
+                                </>
                             )}
                         </div>
                     </div>

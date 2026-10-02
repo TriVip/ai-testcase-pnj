@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { validateImportData } from '../src/utils/importUtils.js';
+import { normalizeProject } from '../src/constants/projects.js';
 
 describe('Import Utils & Validation', () => {
     it('validates valid test cases correctly', () => {
@@ -63,5 +64,12 @@ describe('Import Utils & Validation', () => {
         assert.strictEqual(result.valid, false);
         assert.strictEqual(result.invalidRows, 1);
         assert.ok(result.errors.some(e => e.includes('Priority must be one of')));
+    });
+
+    it('normalizes the Project column case-insensitively, unknown -> unassigned', () => {
+        assert.strictEqual(normalizeProject('omnihub'), 'OmniHub');
+        assert.strictEqual(normalizeProject(' promotion engine '), 'Promotion Engine');
+        assert.strictEqual(normalizeProject('nonsense'), '');
+        assert.strictEqual(normalizeProject(undefined), '');
     });
 });
