@@ -10,6 +10,7 @@ import { buildScopeQuery, resolveWorkspaceForWrite } from '../utils/workspaceAcc
 import { logActivity } from '../utils/activityLog.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { syncPlanStatusFromTestCases } from '../utils/planStatusSync.js';
+import { PROJECTS } from '../constants/projects.js';
 
 // Rate limiter: max 10 delete operations per 10 seconds per user
 const deleteLimiter = createRateLimiter({ windowMs: 10_000, max: 10, message: 'Too many delete requests. Please slow down.' });
@@ -306,6 +307,39 @@ router.post('/batch-delete', deleteLimiter, async (req, res, next) => {
             deletedCount: result.deletedCount,
             obsoletedPlans: affectedPlans.filter(p => p.status === 'Obsolete').map(p => p._id),
         });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @route   POST /api/testcases/batch-project
+// @desc    Move multiple test cases to a project ('' = unassigned)
+router.post('/batch-project', async (req, res, next) => {
+    try {
+        const { ids, project } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > 1000) {
+            return res.status(400).json({ message: 'ids must be an array of 1-1000 items' });
+        }
+        if (project !== '' && !PROJECTS.includes(project)) {
+            return res.status(400).json({ message: 'Invalid project' });
+        }
+
+        const query = await buildScopeQuery(req, { _id: { $in: ids } });
+        // Only ids the caller can actually see — the same scope the update uses.
+        const matched = await TestCase.find(query, '_id workspace');
+        await TestCase.updateMany({ _id: { $in: matched.map(tc => tc._id) } }, { $set: { project } });
+
+        await ActivityLog.insertMany(matched.map(tc => ({
+            entityType: 'TestCase',
+            entityId: tc._id,
+            workspace: req.headers['x-workspace-id'] || tc.workspace || undefined,
+            user: req.userId,
+            action: 'updated',
+            changedFields: ['project'],
+        })));
+
+        res.json({ updatedCount: matched.length, ids: matched.map(tc => tc._id) });
     } catch (error) {
         next(error);
     }

@@ -7,17 +7,15 @@ import { useToast } from '../components/Toast';
 import TestCaseForm from '../components/TestCaseForm';
 import AISuggestionModal from '../components/AISuggestionModal';
 import ImportTestCaseModal from '../components/ImportTestCaseModal';
-import Pagination from '../components/common/Pagination';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { SkeletonTable } from '../components/common/Skeleton';
 import TestCaseFilterBar from '../components/testcases/TestCaseFilterBar';
 import TestCaseBulkActionBar from '../components/testcases/TestCaseBulkActionBar';
-import TestCaseTableRow from '../components/testcases/TestCaseTableRow';
+import TestCaseProjectGroup from '../components/testcases/TestCaseProjectGroup';
 import { PROJECTS } from '../constants/projects';
 
 const UNASSIGNED = '__none__';
-
-const ITEMS_PER_PAGE = 20;
+const PROJECT_GROUPS = [...PROJECTS.map((p) => ({ value: p, label: p })), { value: '', label: 'Unassigned' }];
 
 const buildTcToPlansMap = (plans) => {
     const map = {};
@@ -72,9 +70,6 @@ const TestCases = () => {
     // Sort state
     const [sortCol, setSortCol] = useState('updatedAt');
     const [sortDir, setSortDir] = useState('desc');
-
-    // Pagination state
-    const [page, setPage] = useState(1);
 
     // Action loading states
     const [deleting, setDeleting] = useState(false);
@@ -158,9 +153,14 @@ const TestCases = () => {
                 setDeleting(true);
                 try {
                     const ids = [...selectedIds];
-                    const res = await testCasesAPI.batchDelete(ids);
+                    let deletedCount = 0;
+                    // The endpoint caps each request at 50 ids.
+                    for (let i = 0; i < ids.length; i += 50) {
+                        const res = await testCasesAPI.batchDelete(ids.slice(i, i + 50));
+                        deletedCount += res.data.deletedCount;
+                    }
                     setTestCases((prev) => prev.filter((tc) => !selectedIds.has(tc._id)));
-                    toast.success(`${res.data.deletedCount} test cases deleted`);
+                    toast.success(`${deletedCount} test cases deleted`);
                     setSelectedIds(new Set());
                 } catch (err) {
                     if (err.response?.status === 429) {
@@ -254,8 +254,6 @@ const TestCases = () => {
         return 0;
     });
 
-    const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
-    const pageSlice = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
     const toggleSort = (col) => {
         if (sortCol === col) {
@@ -264,7 +262,6 @@ const TestCases = () => {
             setSortCol(col);
             setSortDir('asc');
         }
-        setPage(1);
     };
 
     const toggleSelect = (id) => {
@@ -275,11 +272,26 @@ const TestCases = () => {
         });
     };
 
-    const toggleSelectAll = () => {
-        if (selectedIds.size === pageSlice.length && pageSlice.length > 0) {
+    // Add or remove a batch of ids from the selection (used by group checkboxes).
+    const setSelected = (ids, on) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+            return next;
+        });
+    };
+
+    const handleBulkAssign = async (project) => {
+        const ids = [...selectedIds];
+        try {
+            const res = await testCasesAPI.batchSetProject(ids, project);
+            const moved = new Set(res.data.ids);
+            setTestCases((prev) => prev.map((tc) => (moved.has(tc._id) ? { ...tc, project } : tc)));
             setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(pageSlice.map((tc) => tc._id)));
+            setHistoryRefresh((v) => v + 1);
+            toast.success(`${res.data.updatedCount} test case(s) moved to ${project || 'Unassigned'}`);
+        } catch {
+            toast.error('Failed to move test cases');
         }
     };
 
@@ -290,7 +302,6 @@ const TestCases = () => {
         setCategoryFilter('All');
         setPlanFilter('All');
         setProjectFilter('All');
-        setPage(1);
     };
 
     const hasFilters =
@@ -355,7 +366,7 @@ const TestCases = () => {
                                 key={t.value}
                                 role="tab"
                                 aria-selected={projectFilter === t.value}
-                                onClick={() => { setProjectFilter(t.value); setPage(1); }}
+                                onClick={() => { setProjectFilter(t.value); }}
                                 className={`btn btn-sm ${projectFilter === t.value ? 'btn-primary' : 'btn-secondary'}`}
                             >
                                 {t.label} <span style={{ opacity: 0.7 }}>({t.count})</span>
@@ -366,16 +377,16 @@ const TestCases = () => {
                     {/* Filter bar */}
                     <TestCaseFilterBar
                         searchTerm={searchTerm}
-                        onSearchChange={(val) => { setSearchTerm(val); setPage(1); }}
+                        onSearchChange={(val) => { setSearchTerm(val); }}
                         priorityFilter={priorityFilter}
-                        onPriorityChange={(val) => { setPriorityFilter(val); setPage(1); }}
+                        onPriorityChange={(val) => { setPriorityFilter(val); }}
                         statusFilter={statusFilter}
-                        onStatusChange={(val) => { setStatusFilter(val); setPage(1); }}
+                        onStatusChange={(val) => { setStatusFilter(val); }}
                         categoryFilter={categoryFilter}
-                        onCategoryChange={(val) => { setCategoryFilter(val); setPage(1); }}
+                        onCategoryChange={(val) => { setCategoryFilter(val); }}
                         categories={categories}
                         planFilter={planFilter}
-                        onPlanChange={(val) => { setPlanFilter(val); setPage(1); }}
+                        onPlanChange={(val) => { setPlanFilter(val); }}
                         testPlans={testPlans}
                         hasFilters={hasFilters}
                         onClearFilters={clearFilters}
@@ -387,8 +398,9 @@ const TestCases = () => {
                     {selectedIds.size > 0 && (
                         <TestCaseBulkActionBar
                             selectedCount={selectedIds.size}
-                            onExport={() => handleExport(testCases.filter((tc) => selectedIds.has(tc._id)))}
-                            onDelete={handleBulkDelete}
+                            onBulkExport={() => handleExport(testCases.filter((tc) => selectedIds.has(tc._id)))}
+                            onBulkDelete={handleBulkDelete}
+                            onBulkAssign={handleBulkAssign}
                             deleting={deleting}
                             onClearSelection={() => setSelectedIds(new Set())}
                         />
@@ -421,73 +433,37 @@ const TestCases = () => {
                             </button>
                         </div>
                     ) : (
-                        <>
-                            <div className="data-table-wrapper">
-                                <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ width: 36 }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.size === pageSlice.length && pageSlice.length > 0}
-                                                    onChange={toggleSelectAll}
-                                                    aria-label="Select all on this page"
-                                                    style={{ cursor: 'pointer' }}
-                                                />
-                                            </th>
-                                            <th style={{ width: 36 }}>#</th>
-                                            <th className="sortable" onClick={() => toggleSort('title')}>
-                                                Title {sortCol === 'title' && (sortDir === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="sortable" style={{ width: 110 }} onClick={() => toggleSort('priority')}>
-                                                Priority {sortCol === 'priority' && (sortDir === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="sortable" style={{ width: 110 }} onClick={() => toggleSort('executionStatus')}>
-                                                Status {sortCol === 'executionStatus' && (sortDir === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="sortable" style={{ width: 130 }} onClick={() => toggleSort('project')}>
-                                                Project {sortCol === 'project' && (sortDir === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th style={{ width: 130 }}>Category</th>
-                                            <th style={{ width: 120 }}>In Plans</th>
-                                            <th className="col-actions-md" style={{ textAlign: 'right' }}>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pageSlice.map((tc, idx) => (
-                                            <TestCaseTableRow
-                                                key={tc._id}
-                                                tc={tc}
-                                                index={(page - 1) * ITEMS_PER_PAGE + idx + 1}
-                                                isSelected={selectedIds.has(tc._id)}
-                                                isExpanded={expandedRow === tc._id}
-                                                onToggleSelect={() => toggleSelect(tc._id)}
-                                                onToggleExpand={() => setExpandedRow(expandedRow === tc._id ? null : tc._id)}
-                                                onEdit={() => { setEditingTestCase(tc); setShowForm(true); }}
-                                                onImprove={() => handleImprove(tc)}
-                                                onDelete={() => handleDelete(tc._id, tc.title)}
-                                                improvingId={improvingId}
-                                                deleting={deleting}
-                                                plans={tcToPlans[tc._id] || []}
-                                                historyRefresh={historyRefresh}
-                                                onNavigateToPlan={(planId, tcId) => {
-                                                    navigate('/testplans', { state: { selectPlanId: planId, selectTCId: tcId } });
-                                                }}
-                                            />
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Pagination */}
-                            <Pagination
-                                currentPage={page}
-                                totalPages={totalPages}
-                                totalItems={sorted.length}
-                                itemsPerPage={ITEMS_PER_PAGE}
-                                onPageChange={(newPage) => setPage(newPage)}
-                            />
-                        </>
+                        PROJECT_GROUPS.map((g) => {
+                            const rows = sorted.filter((tc) => (tc.project || '') === g.value);
+                            if (rows.length === 0) return null;
+                            return (
+                                <TestCaseProjectGroup
+                                    key={g.value || 'unassigned'}
+                                    title={g.label}
+                                    rows={rows}
+                                    selectedIds={selectedIds}
+                                    onSetSelected={setSelected}
+                                    sortCol={sortCol}
+                                    sortDir={sortDir}
+                                    onToggleSort={toggleSort}
+                                    rowProps={(tc) => ({
+                                        isExpanded: expandedRow === tc._id,
+                                        onToggleSelect: () => toggleSelect(tc._id),
+                                        onToggleExpand: () => setExpandedRow(expandedRow === tc._id ? null : tc._id),
+                                        onEdit: () => { setEditingTestCase(tc); setShowForm(true); },
+                                        onImprove: () => handleImprove(tc),
+                                        onDelete: () => handleDelete(tc._id, tc.title),
+                                        improvingId,
+                                        deleting,
+                                        plans: tcToPlans[tc._id] || [],
+                                        historyRefresh,
+                                        onNavigateToPlan: (planId, tcId) => {
+                                            navigate('/testplans', { state: { selectPlanId: planId, selectTCId: tcId } });
+                                        },
+                                    })}
+                                />
+                            );
+                        })
                     )}
                 </div>
 

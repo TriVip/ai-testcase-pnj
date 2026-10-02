@@ -83,6 +83,7 @@ export const testCasesAPI = {
     update: (id, data) => api.put(`/testcases/${id}`, data),
     delete: (id) => api.delete(`/testcases/${id}`),
     batchDelete: (ids) => api.post('/testcases/batch-delete', { ids }),
+    batchSetProject: (ids, project) => api.post('/testcases/batch-project', { ids, project }),
     importTestCases: (file, { planId, newPlanName } = {}) => {
         const formData = new FormData();
         formData.append('file', file);
