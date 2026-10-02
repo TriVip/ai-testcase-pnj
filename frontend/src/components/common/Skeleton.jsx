@@ -59,6 +59,15 @@ export const SkeletonTable = ({ rows = 5, cols = 5 }) => (
     </div>
 );
 
+// A few stacked lines of varying width, for lists and text blocks.
+export const SkeletonLines = ({ count = 3, height = 14, gap = 'var(--space-2)' }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap }}>
+        {Array.from({ length: count }).map((_, i) => (
+            <SkeletonText key={i} width={['90%', '70%', '80%', '60%'][i % 4]} height={height} />
+        ))}
+    </div>
+);
+
 export default {
     Text: SkeletonText,
     Tile: SkeletonTile,

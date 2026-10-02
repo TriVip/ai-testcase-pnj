@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SkeletonLines } from './common/Skeleton';
 
 const fmtDateTime = (d) => new Date(d).toLocaleString('en-GB', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -44,7 +45,7 @@ const ActivityHistory = ({ historyFn, entityId, refreshToken }) => {
     }, [historyFn, entityId, refreshToken]);
 
     if (loading) {
-        return <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Loading history…</div>;
+        return <div aria-busy="true" aria-label="Loading history"><SkeletonLines count={3} height={10} gap={8} /></div>;
     }
     if (error) {
         return <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Failed to load history</div>;

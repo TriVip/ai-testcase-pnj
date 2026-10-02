@@ -7,16 +7,21 @@ import TestCases from './pages/TestCases';
 import TestPlans from './pages/TestPlans';
 import BugTracking from './pages/BugTracking';
 import Automation from './pages/Automation';
+import { SkeletonText, SkeletonLines, SkeletonTable } from './components/common/Skeleton';
 
 const PrivateRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
 
     if (loading) {
         return (
-            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app)' }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div className="spinner spinner-lg" style={{ margin: '0 auto' }} />
-                    <p style={{ marginTop: 12, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Loading…</p>
+            <div aria-busy="true" aria-label="Loading" style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-app)' }}>
+                <div style={{ width: 'var(--sidebar-width)', flexShrink: 0, background: 'var(--bg-sidebar)', padding: 'var(--space-4)' }}>
+                    <SkeletonText width="60%" height={20} style={{ marginBottom: 'var(--space-6)' }} />
+                    <SkeletonLines count={5} height={16} gap="var(--space-4)" />
+                </div>
+                <div style={{ flex: 1, padding: 'var(--space-8)', minWidth: 0 }}>
+                    <SkeletonText width={180} height={26} style={{ marginBottom: 'var(--space-6)' }} />
+                    <SkeletonTable rows={6} cols={5} />
                 </div>
             </div>
         );
