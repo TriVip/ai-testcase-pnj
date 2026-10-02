@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PROJECTS } from '../constants/projects.js';
 
 const testCaseSchema = new mongoose.Schema(
     {
@@ -50,6 +51,12 @@ const testCaseSchema = new mongoose.Schema(
         feature: {
             type: String,
             default: 'General',
+        },
+        // '' is a member of the enum so it can be cleared (see bug fields below).
+        project: {
+            type: String,
+            enum: [...PROJECTS, ''],
+            default: '',
         },
         tags: [String],
         executionStatus: {
