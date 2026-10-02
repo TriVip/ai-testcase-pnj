@@ -1,6 +1,40 @@
 # Deployment
 
-Runbook for deploying this app to a VM (EC2 or equivalent) with Docker Compose. For local development, see [QUICKSTART.md](QUICKSTART.md) instead — this document is for a real, internet-reachable deployment.
+Two supported layouts. **A is what production runs today.** B is the original VM setup, kept for anyone who wants an always-on host.
+
+## A. Render (backend) + Cloudflare Pages (frontend) + Atlas M0 — all free tier
+
+```
+Browser ── https://<project>.pages.dev  (Cloudflare Pages, static frontend/dist)
+   │  XHR + Socket.io, cross-origin, cookie SameSite=None; Secure
+   ▼
+https://<service>.onrender.com  (Render web service, backend/, `npm start`)
+   ▼
+MongoDB Atlas M0
+```
+
+The frontend is built with `VITE_API_URL` set to the Render origin; `frontend/src/services/api.js` and `socket.js` use it for `/api` and `/socket.io`. Unset, they stay same-origin (the Docker/nginx and Vite-proxy setups). The backend needs no special mode: it already sends a `SameSite=None; Secure` cookie and allows CORS/Socket.io from `FRONTEND_URL`.
+
+**Setup (in order):**
+1. **Atlas**: Network Access → allow `0.0.0.0/0` (Render has no fixed outbound IP).
+2. **Render**: New → Blueprint → this repo (`render.yaml`). Enter the `sync: false` secrets in the dashboard: `MONGODB_URI`, `JWT_SECRET`, `OPENAI_API_KEY`, `FRONTEND_URL`.
+3. **Cloudflare Pages**: connect the repo; production branch `main`; root directory `frontend`; build `npm run build`; output `dist`; env var `VITE_API_URL=https://<service>.onrender.com` (no trailing slash).
+4. **Render**: set `FRONTEND_URL=https://<project>.pages.dev` (no trailing slash), let it redeploy.
+5. Check `https://<service>.onrender.com/health` → `{"status":"OK","db":"connected"}`, then log in from the Pages URL and refresh.
+
+**Deploys are automatic** from `main` on both Render and Pages (unlike the VM path). Changing `VITE_API_URL` needs a Pages rebuild, since Vite inlines it at build time.
+
+**Caveats**
+- Render free sleeps after ~15 min idle; the next request takes ~30-60 s. Socket.io connections drop when it sleeps and reconnect on their own.
+- Atlas M0 pauses after prolonged inactivity (data is kept). Resume it in the Atlas UI. Sleeping Render plus no traffic can trigger this.
+- CORS error or "logged in, then logged out": `FRONTEND_URL` must exactly equal the Pages origin.
+- Never put secrets in `render.yaml` — the repo is public.
+
+---
+
+## B. VM with Docker Compose (original setup)
+
+Runbook for deploying this app to a VM (EC2, Oracle Cloud, or equivalent) with Docker Compose. For local development, see [QUICKSTART.md](QUICKSTART.md) instead — this document is for a real, internet-reachable deployment.
 
 ## Architecture
 
