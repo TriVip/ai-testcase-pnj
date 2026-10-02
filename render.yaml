@@ -1,0 +1,24 @@
+# Render Blueprint: backend only. Frontend goes on Cloudflare Pages (see docs).
+# Free plan sleeps after ~15 min idle; first request afterwards takes ~30-60s.
+services:
+  - type: web
+    name: testcase-gen-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Secrets: set these in the Render dashboard, never here (public repo).
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      # Origin of the Cloudflare Pages site, e.g. https://xxx.pages.dev
+      - key: FRONTEND_URL
+        sync: false

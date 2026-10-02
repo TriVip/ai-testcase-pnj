@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: '/api',
+    // VITE_API_URL is the backend origin when it is hosted separately from the
+    // frontend (Cloudflare Pages + Render). Unset => same-origin, via nginx/Vite proxy.
+    baseURL: `${import.meta.env.VITE_API_URL || ''}/api`,
     withCredentials: true,
 });
 
