@@ -88,7 +88,7 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-3.5-turbo
 
 # Session Cookie Setting
-# Set to 'false' only for plain HTTP deployments without TLS (e.g. bare EC2 IP)
+# Set to 'false' only for plain HTTP deployments without TLS (e.g. a bare VM IP)
 COOKIE_SECURE=true
 ```
 
@@ -102,6 +102,12 @@ npm run dev
 npm run dev:backend   # API server on http://localhost:9999
 npm run dev:frontend  # Vite dev server on http://localhost:5173
 ```
+
+---
+
+## Deployment 🚀
+
+Production runs on free tiers: backend on Render, frontend on Cloudflare Pages, database on MongoDB Atlas M0. Setup steps and caveats are in [docs/specs/deployment/_source/DEPLOYMENT.md](docs/specs/deployment/_source/DEPLOYMENT.md). `docker-compose.yml` still works for a self-hosted VM.
 
 ---
 
