@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import { SkeletonText, SkeletonLines } from '../components/common/Skeleton';
 import { testPlansAPI, testCasesAPI, jiraAPI } from '../services/api';
 import socket from '../services/socket';
 import { exportTestPlanToXLSX } from '../utils/exportToXLSX';
@@ -361,8 +362,23 @@ const TestPlans = () => {
     if (loading) {
         return (
             <AppShell>
-                <div className="page-inner" style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-secondary)' }}>
-                    <div className="spinner spinner-lg" /> Loading test plans…
+                <div className="page-inner" aria-busy="true" aria-label="Loading test plans">
+                    <div className="page-header">
+                        <div className="page-header-left">
+                            <h1 className="page-title">Test Plans</h1>
+                            <SkeletonText width={90} height={12} style={{ marginTop: 6 }} />
+                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 'var(--space-6)', alignItems: 'start' }}>
+                        <div className="panel" style={{ padding: 'var(--space-4)' }}>
+                            <SkeletonText height={30} style={{ marginBottom: 'var(--space-4)' }} />
+                            <SkeletonLines count={6} height={16} gap="var(--space-3)" />
+                        </div>
+                        <div className="panel" style={{ padding: 'var(--space-6)' }}>
+                            <SkeletonText width="40%" height={22} style={{ marginBottom: 'var(--space-4)' }} />
+                            <SkeletonLines count={4} />
+                        </div>
+                    </div>
                 </div>
             </AppShell>
         );

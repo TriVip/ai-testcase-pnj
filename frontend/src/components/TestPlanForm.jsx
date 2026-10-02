@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { testPlansAPI, testCasesAPI } from '../services/api';
 import { PROJECTS } from '../constants/projects';
+import { SkeletonLines } from './common/Skeleton';
 
 const UNASSIGNED = '__none__';
 
@@ -14,6 +15,7 @@ const TestPlanForm = ({ testPlan, onClose }) => {
         testCases: [],
     });
     const [availableTestCases, setAvailableTestCases] = useState([]);
+    const [casesLoading, setCasesLoading] = useState(true);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [projectFilter, setProjectFilter] = useState('All');
@@ -51,6 +53,8 @@ const TestPlanForm = ({ testPlan, onClose }) => {
             setAvailableTestCases(response.data);
         } catch (error) {
             console.error('Failed to fetch test cases:', error);
+        } finally {
+            setCasesLoading(false);
         }
     };
 
@@ -211,7 +215,11 @@ const TestPlanForm = ({ testPlan, onClose }) => {
                                     </button>
                                 )}
                             </div>
-                            {availableTestCases.length === 0 ? (
+                            {casesLoading ? (
+                                <div aria-busy="true" aria-label="Loading test cases" style={{ background: 'var(--bg-surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: 'var(--space-3)' }}>
+                                    <SkeletonLines count={5} height={16} gap="var(--space-3)" />
+                                </div>
+                            ) : availableTestCases.length === 0 ? (
                                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No test cases available. Create some test cases first.</p>
                             ) : (
                                 <>
