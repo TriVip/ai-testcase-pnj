@@ -94,7 +94,7 @@ export const exportTestPlanToXLSX = async (testPlan, filename = 'test-plan.xlsx'
     worksheet.addRow([]);
 
     const headerRow = worksheet.addRow([
-        'No.', 'Title', 'Description', 'Priority', 'Status', 'Category',
+        'No.', 'Title', 'Description', 'Priority', 'Status', 'Category', 'Project',
     ]);
     headerRow.font = { bold: true };
 
@@ -106,6 +106,7 @@ export const exportTestPlanToXLSX = async (testPlan, filename = 'test-plan.xlsx'
             tc.priority,
             tc.status,
             tc.category,
+            tc.project || '',
         ]);
     });
 
@@ -117,6 +118,7 @@ export const exportTestPlanToXLSX = async (testPlan, filename = 'test-plan.xlsx'
     worksheet.getColumn(4).width = 10;
     worksheet.getColumn(5).width = 10;
     worksheet.getColumn(6).width = 15;
+    worksheet.getColumn(7).width = 16;
 
     await downloadWorkbook(workbook, filename);
 };
