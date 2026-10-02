@@ -68,11 +68,27 @@ const TestCaseTableRow = ({
                         </div>
                     </div>
                 </td>
-                <td style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.category || '—'}</td>
                 <td><StatusTag status={tc.priority || 'Medium'} /></td>
-
-                <td style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                    {tc.steps?.length || 0}
+                <td><StatusTag status={tc.executionStatus || 'Pending'} /></td>
+                <td style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.project || '—'}</td>
+                <td style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{tc.category || '—'}</td>
+                <td style={{ fontSize: 'var(--text-xs)' }} onClick={(e) => e.stopPropagation()}>
+                    {plans.length === 0 ? (
+                        <span style={{ color: 'var(--text-tertiary)' }}>—</span>
+                    ) : (
+                        plans.map((plan, i) => (
+                            <span key={plan._id}>
+                                {i > 0 && ', '}
+                                <a
+                                    href="#"
+                                    onClick={(e) => { e.preventDefault(); onNavigateToPlan(plan._id, tc._id); }}
+                                    style={{ color: 'var(--brand)' }}
+                                >
+                                    {plan.name}
+                                </a>
+                            </span>
+                        ))
+                    )}
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -113,7 +129,7 @@ const TestCaseTableRow = ({
             {/* Expanded detail row */}
             {isExpanded && (
                 <tr key={`${tc._id}-detail`} className="row-detail">
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                         {tc.externalId && (
                             <div style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
                                 ID: {tc.externalId}

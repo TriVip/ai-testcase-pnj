@@ -43,6 +43,7 @@ export const exportTestCasesToXLSX = async (testCases, filename = 'test-cases.xl
         { header: 'Description', key: 'description', width: 40 },
         { header: 'Priority', key: 'priority', width: 10 },
         { header: 'Status', key: 'status', width: 10 },
+        { header: 'Project', key: 'project', width: 16 },
         { header: 'Category', key: 'category', width: 15 },
         { header: 'Steps', key: 'steps', width: 50 },
         { header: 'Tags', key: 'tags', width: 20 },
@@ -57,6 +58,7 @@ export const exportTestCasesToXLSX = async (testCases, filename = 'test-cases.xl
             description: tc.description,
             priority: tc.priority,
             status: tc.status,
+            project: tc.project || '',
             category: tc.category,
             steps: (tc.steps || []).map((step, i) =>
                 `${i + 1}. ${step.action} | Expected: ${step.expectedResult}`

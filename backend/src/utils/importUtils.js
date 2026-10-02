@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
+import { normalizeProject } from '../constants/projects.js';
 
 /**
  * Read the value of a cell as a plain string.
@@ -213,6 +214,7 @@ const transformRowToTestCase = (row) => {
         description: descriptions,
         feature: row['Feature'] || row.feature || 'General',
         category: row['Category'] || row.category || 'General',
+        project: normalizeProject(row['Project'] || row.project),
         preCondition: row['Pre-condition'] || row.preCondition || '',
         testData: row['Test data'] || row.testData || '',
         priority: row['Priority'] || row.priority || 'Medium',

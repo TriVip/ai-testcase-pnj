@@ -33,6 +33,7 @@ const ALLOWED_FIELDS = [
     'status',
     'category',
     'feature',
+    'project',
     'tags',
     'executionStatus',
     'executionNotes',

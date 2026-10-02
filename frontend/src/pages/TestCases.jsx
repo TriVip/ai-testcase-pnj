@@ -13,6 +13,9 @@ import { SkeletonTable } from '../components/common/Skeleton';
 import TestCaseFilterBar from '../components/testcases/TestCaseFilterBar';
 import TestCaseBulkActionBar from '../components/testcases/TestCaseBulkActionBar';
 import TestCaseTableRow from '../components/testcases/TestCaseTableRow';
+import { PROJECTS } from '../constants/projects';
+
+const UNASSIGNED = '__none__';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -64,6 +67,7 @@ const TestCases = () => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [planFilter, setPlanFilter] = useState('All');
+    const [projectFilter, setProjectFilter] = useState('All');
 
     // Sort state
     const [sortCol, setSortCol] = useState('updatedAt');
@@ -235,8 +239,10 @@ const TestCases = () => {
         const matchPriority = priorityFilter === 'All' || tc.priority === priorityFilter;
         const matchStatus = statusFilter === 'All' || tc.executionStatus === statusFilter;
         const matchCategory = categoryFilter === 'All' || tc.category === categoryFilter;
+        const matchProject =
+            projectFilter === 'All' || (projectFilter === UNASSIGNED ? !tc.project : tc.project === projectFilter);
         const matchPlan = planFilter === 'All' || (tcToPlans[tc._id] || []).some((p) => p._id === planFilter);
-        return matchSearch && matchPriority && matchStatus && matchCategory && matchPlan;
+        return matchSearch && matchPriority && matchStatus && matchCategory && matchPlan && matchProject;
     });
 
     const sorted = [...filtered].sort((a, b) => {
@@ -283,11 +289,12 @@ const TestCases = () => {
         setStatusFilter('All');
         setCategoryFilter('All');
         setPlanFilter('All');
+        setProjectFilter('All');
         setPage(1);
     };
 
     const hasFilters =
-        searchTerm || priorityFilter !== 'All' || statusFilter !== 'All' || categoryFilter !== 'All' || planFilter !== 'All';
+        searchTerm || priorityFilter !== 'All' || statusFilter !== 'All' || categoryFilter !== 'All' || planFilter !== 'All' || projectFilter !== 'All';
 
     return (
         <>
@@ -337,6 +344,25 @@ const TestCases = () => {
                         </div>
                     </div>
 
+                    {/* Project tabs */}
+                    <div className="project-tabs" role="tablist" style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
+                        {[
+                            { value: 'All', label: 'All', count: testCases.length },
+                            ...PROJECTS.map((p) => ({ value: p, label: p, count: testCases.filter((tc) => tc.project === p).length })),
+                            { value: UNASSIGNED, label: 'Unassigned', count: testCases.filter((tc) => !tc.project).length },
+                        ].map((t) => (
+                            <button
+                                key={t.value}
+                                role="tab"
+                                aria-selected={projectFilter === t.value}
+                                onClick={() => { setProjectFilter(t.value); setPage(1); }}
+                                className={`btn btn-sm ${projectFilter === t.value ? 'btn-primary' : 'btn-secondary'}`}
+                            >
+                                {t.label} <span style={{ opacity: 0.7 }}>({t.count})</span>
+                            </button>
+                        ))}
+                    </div>
+
                     {/* Filter bar */}
                     <TestCaseFilterBar
                         searchTerm={searchTerm}
@@ -370,7 +396,7 @@ const TestCases = () => {
 
                     {/* Table View with Skeleton Loading */}
                     {loading ? (
-                        <SkeletonTable rows={8} cols={7} />
+                        <SkeletonTable rows={8} cols={8} />
                     ) : testCases.length === 0 ? (
                         <div className="empty-state panel">
                             <div className="empty-state-icon">📋</div>
@@ -418,6 +444,9 @@ const TestCases = () => {
                                             </th>
                                             <th className="sortable" style={{ width: 110 }} onClick={() => toggleSort('executionStatus')}>
                                                 Status {sortCol === 'executionStatus' && (sortDir === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="sortable" style={{ width: 130 }} onClick={() => toggleSort('project')}>
+                                                Project {sortCol === 'project' && (sortDir === 'asc' ? '↑' : '↓')}
                                             </th>
                                             <th style={{ width: 130 }}>Category</th>
                                             <th style={{ width: 120 }}>In Plans</th>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { testCasesAPI } from '../services/api';
+import { PROJECTS } from '../constants/projects';
 
 const TestCaseForm = ({ testCase, onClose }) => {
     const [formData, setFormData] = useState({
@@ -12,6 +13,7 @@ const TestCaseForm = ({ testCase, onClose }) => {
         status: 'Draft',
         category: 'General',
         feature: 'General',
+        project: '',
         tags: [],
         steps: [{ stepNumber: 1, action: '', expectedResult: '' }],
         bugType: '',
@@ -35,6 +37,7 @@ const TestCaseForm = ({ testCase, onClose }) => {
                 status: testCase.status || 'Draft',
                 category: testCase.category || 'General',
                 feature: testCase.feature || 'General',
+                project: testCase.project || '',
                 tags: testCase.tags || [],
                 steps: testCase.steps?.length > 0 ? testCase.steps : [{ stepNumber: 1, action: '', expectedResult: '' }],
                 bugType: testCase.bugType || '',
@@ -231,6 +234,21 @@ const TestCaseForm = ({ testCase, onClose }) => {
                                     placeholder="e.g., Functional"
                                 />
                             </div>
+                        </div>
+
+                        {/* Project */}
+                        <div className="form-group">
+                            <label className="form-label">Project</label>
+                            <select
+                                value={formData.project}
+                                onChange={(e) => setFormData({ ...formData, project: e.target.value })}
+                                className="input-field"
+                            >
+                                <option value="">— Unassigned —</option>
+                                {PROJECTS.map((p) => (
+                                    <option key={p} value={p}>{p}</option>
+                                ))}
+                            </select>
                         </div>
 
                         {/* Feature/Module */}
