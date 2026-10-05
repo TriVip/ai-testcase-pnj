@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import AppShell from '../components/AppShell';
@@ -6,10 +6,14 @@ import StatusTag from '../components/StatusTag';
 import { SkeletonTile, SkeletonTable } from '../components/common/Skeleton';
 import { testCasesAPI, testPlansAPI } from '../services/api';
 
+// Lazy so Recharts lands in its own chunk instead of the main bundle.
+const DashboardCharts = lazy(() => import('../components/DashboardCharts'));
+
 const Dashboard = () => {
     const { user } = useAuth();
     const [stats, setStats] = useState(null);
     const [recentTCs, setRecentTCs] = useState([]);
+    const [testCases, setTestCases] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -29,6 +33,7 @@ const Dashboard = () => {
                 const activePlans = plans.filter((p) => p.status === 'In Progress' || p.status === 'Planning').length;
                 const passRate = tcs.length > 0 ? Math.round((pass / tcs.length) * 100) : 0;
 
+                setTestCases(tcs);
                 setStats({ total: tcs.length, pass, failed, pending, na, passRate, activePlans, totalPlans: plans.length });
                 // Recent: last 8 TCs sorted by updatedAt or createdAt
                 const sorted = [...tcs].sort((a, b) =>
@@ -135,6 +140,10 @@ const Dashboard = () => {
                                 <div className="kpi-delta">require attention</div>
                             </div>
                         </div>
+
+                        <Suspense fallback={<div className="dashboard-charts-grid" style={{ height: 300 }} />}>
+                            <DashboardCharts testCases={testCases} />
+                        </Suspense>
 
                         {/* Two-column content area */}
                         <div className="dashboard-content-grid">
