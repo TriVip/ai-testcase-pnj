@@ -31,16 +31,10 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Login with credentials, saves user directly from response (no extra /current call)
-    const loginWithCredentials = async (username, password) => {
-        const response = await api.post('/auth/login', { username, password }, { withCredentials: true });
-        setUser(response.data.user);
-        return response.data;
-    };
-
-    // Register, saves user directly from response (no extra /current call)
-    const registerUser = async (formData) => {
-        const response = await api.post('/auth/register', formData, { withCredentials: true });
+    // Exchange a Google ID token for our session cookie; saves user directly
+    // from the response (no extra /current call)
+    const loginWithGoogle = async (credential) => {
+        const response = await api.post('/auth/google', { credential });
         setUser(response.data.user);
         return response.data;
     };
@@ -58,8 +52,7 @@ export const AuthProvider = ({ children }) => {
     const value = {
         user,
         loading,
-        loginWithCredentials,
-        registerUser,
+        loginWithGoogle,
         logout,
         isAuthenticated: !!user,
     };
