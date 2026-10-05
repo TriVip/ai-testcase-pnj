@@ -1252,6 +1252,24 @@
   align-items: start;
 }
 
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+.dashboard-donut-center {
+  position: absolute;
+  inset: 0 0 36px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--text-primary);
+}
+
 .testplans-layout {
   display: flex;
   gap: var(--space-5);
@@ -1375,7 +1393,8 @@
   }
 
   /* Dashboard two-column → single column */
-  .dashboard-content-grid {
+  .dashboard-content-grid,
+  .dashboard-charts-grid {
     grid-template-columns: 1fr;
   }
 
