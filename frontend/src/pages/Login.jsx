@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,17 +19,10 @@ const IconMoon = () => (
 );
 
 const Login = () => {
-    const { loginWithCredentials, registerUser } = useAuth();
+    const { loginWithGoogle } = useAuth();
     const navigate = useNavigate();
-    const [isRegister, setIsRegister] = useState(false);
-    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [formData, setFormData] = useState({
-        username: '',
-        password: '',
-        email: '',
-        name: '',
-    });
+    const googleButtonRef = useRef(null);
 
     const [isDark, setIsDark] = useState(() => {
         const saved = localStorage.getItem('theme');
@@ -47,24 +40,41 @@ const Login = () => {
         }
     }, [isDark]);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        try {
-            if (isRegister) {
-                await registerUser(formData);
-            } else {
-                await loginWithCredentials(formData.username, formData.password);
-            }
-            navigate('/dashboard');
-        } catch (err) {
-            setError(err.response?.data?.message || 'Authentication failed');
-        } finally {
-            setLoading(false);
+    // Google Identity Services: load the script, render Google's own button.
+    useEffect(() => {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!clientId) {
+            setError('Google sign-in is not configured (VITE_GOOGLE_CLIENT_ID).');
+            return;
         }
-    };
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.onload = () => {
+            window.google.accounts.id.initialize({
+                client_id: clientId,
+                callback: async ({ credential }) => {
+                    setError('');
+                    try {
+                        await loginWithGoogle(credential);
+                        navigate('/dashboard');
+                    } catch (err) {
+                        setError(err.response?.data?.message || 'Authentication failed');
+                    }
+                },
+            });
+            window.google.accounts.id.renderButton(googleButtonRef.current, {
+                theme: isDark ? 'filled_black' : 'outline',
+                size: 'large',
+                width: 360,
+                text: 'signin_with',
+            });
+        };
+        script.onerror = () => setError('Could not load Google sign-in.');
+        document.body.appendChild(script);
+        return () => script.remove();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div
@@ -132,7 +142,7 @@ const Login = () => {
                             QA Manager
                         </h1>
                         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)', textAlign: 'center' }}>
-                            {isRegister ? 'Create your team workspace account' : 'Sign in to your QA management account'}
+                            Sign in with your Google account
                         </p>
                     </div>
 
@@ -157,92 +167,7 @@ const Login = () => {
                         </div>
                     )}
 
-                    {/* Auth Form */}
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                        <div className="form-group">
-                            <label className="form-label">Username</label>
-                            <input
-                                type="text"
-                                required
-                                autoFocus
-                                value={formData.username}
-                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                className="input-field"
-                                placeholder="Enter your username"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label className="form-label">Password</label>
-                            <input
-                                type="password"
-                                required
-                                value={formData.password}
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                className="input-field"
-                                placeholder="Enter your password"
-                            />
-                        </div>
-
-                        {isRegister && (
-                            <>
-                                <div className="form-group">
-                                    <label className="form-label">Email Address</label>
-                                    <input
-                                        type="email"
-                                        required
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="input-field"
-                                        placeholder="name@company.com"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Full Name</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="input-field"
-                                        placeholder="e.g. Alex Nguyen"
-                                    />
-                                </div>
-                            </>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="btn btn-primary"
-                            style={{ width: '100%', padding: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-2)' }}
-                        >
-                            {loading ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <div className="spinner" style={{ borderTopColor: '#fff' }} />
-                                    <span>Please wait…</span>
-                                </div>
-                            ) : (
-                                <span>{isRegister ? 'Register Account' : 'Sign In'}</span>
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Toggle Login / Register */}
-                    <div style={{ marginTop: 'var(--space-5)', textAlign: 'center' }}>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsRegister(!isRegister);
-                                setError('');
-                            }}
-                            className="btn btn-ghost"
-                            style={{ fontSize: 'var(--text-sm)', color: 'var(--brand)' }}
-                        >
-                            {isRegister ? 'Already have an account? Sign in' : "Don't have an account? Register"}
-                        </button>
-                    </div>
+                    <div ref={googleButtonRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
 
                     {/* Features checklist */}
                     <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border)' }}>

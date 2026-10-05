@@ -17,6 +17,9 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      # Google OAuth Web client ID; Pages needs it too as VITE_GOOGLE_CLIENT_ID.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       # Origin of the Cloudflare Pages site, e.g. https://xxx.pages.dev
