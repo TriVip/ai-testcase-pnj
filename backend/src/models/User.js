@@ -31,6 +31,12 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: 'https://ui-avatars.com/api/?name=User&background=0ea5e9&color=fff',
         },
+        // Last workspace the user picked, so every device opens the same one.
+        // Only a UI preference — access is still checked per request.
+        lastWorkspace: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Workspace',
+        },
     },
     {
         timestamps: true,

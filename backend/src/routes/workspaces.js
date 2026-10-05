@@ -2,6 +2,7 @@ import express from 'express';
 import Workspace from '../models/Workspace.js';
 import User from '../models/User.js';
 import { isAuthenticated } from '../middleware/auth.js';
+import { userCanAccessWorkspace, WorkspaceAccessError } from '../utils/workspaceAccess.js';
 
 const router = express.Router();
 
@@ -43,6 +44,22 @@ router.get('/', isAuthenticated, async (req, res, next) => {
         res.json(workspaces);
     } catch (error) {
         console.error('Error fetching workspaces:', error);
+        next(error);
+    }
+});
+
+// @route   PUT /api/workspaces/active
+// @desc    Remember the user's selected workspace across devices
+// @access  Private
+router.put('/active', isAuthenticated, async (req, res, next) => {
+    try {
+        const { workspaceId } = req.body;
+        if (!(await userCanAccessWorkspace(req.userId, workspaceId))) {
+            throw new WorkspaceAccessError();
+        }
+        await User.updateOne({ _id: req.userId }, { lastWorkspace: workspaceId });
+        res.json({ lastWorkspace: workspaceId });
+    } catch (error) {
         next(error);
     }
 });

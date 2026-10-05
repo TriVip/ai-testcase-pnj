@@ -188,6 +188,7 @@ router.post('/login', authLimiter, async (req, res) => {
                 email: user.email,
                 name: user.name,
                 picture: user.picture,
+                lastWorkspace: user.lastWorkspace,
             },
         });
     } catch (error) {

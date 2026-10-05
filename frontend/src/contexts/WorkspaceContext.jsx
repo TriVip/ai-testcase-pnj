@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
     workspacesAPI,
     ACTIVE_WORKSPACE_KEY,
@@ -20,12 +20,29 @@ export const WorkspaceProvider = ({ children }) => {
     // explain why the selection changed on its own.
     const [accessDeniedNotice, setAccessDeniedNotice] = useState(null);
 
-    const setActiveWorkspace = (workspace) => {
+    // The server-side choice wins over this browser's cached one, so switching
+    // on one device carries over to the others on their next load. Kept in a
+    // ref (not read from `user`) so a refetch never reverts a switch made in
+    // this session.
+    const lastWorkspaceRef = useRef(null);
+
+    const applyActiveWorkspace = (workspace) => {
         setActiveWorkspaceState(workspace);
         if (workspace) {
             localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace._id);
         } else {
             localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+        }
+    };
+
+    // User-initiated switch: also remember it on the server for other devices.
+    const setActiveWorkspace = (workspace) => {
+        applyActiveWorkspace(workspace);
+        if (workspace) {
+            lastWorkspaceRef.current = workspace._id;
+            workspacesAPI.setActive(workspace._id).catch((error) => {
+                console.error('Failed to save active workspace:', error);
+            });
         }
     };
 
@@ -38,18 +55,19 @@ export const WorkspaceProvider = ({ children }) => {
             setWorkspaces(fetchedWorkspaces);
 
             if (fetchedWorkspaces.length > 0) {
-                const savedId = localStorage.getItem('activeWorkspaceId');
-                const savedWorkspace = fetchedWorkspaces.find((w) => w._id === savedId);
+                const savedWorkspace =
+                    fetchedWorkspaces.find((w) => w._id === lastWorkspaceRef.current) ||
+                    fetchedWorkspaces.find((w) => w._id === localStorage.getItem(ACTIVE_WORKSPACE_KEY));
 
                 if (savedWorkspace) {
-                    setActiveWorkspace(savedWorkspace);
+                    applyActiveWorkspace(savedWorkspace);
                 } else {
                     // Default to personal workspace or the first one
                     const personal = fetchedWorkspaces.find(w => w.isPersonal) || fetchedWorkspaces[0];
-                    setActiveWorkspace(personal);
+                    applyActiveWorkspace(personal);
                 }
             } else {
-                setActiveWorkspace(null);
+                applyActiveWorkspace(null);
             }
         } catch (error) {
             console.error('Failed to fetch workspaces:', error);
@@ -66,10 +84,12 @@ export const WorkspaceProvider = ({ children }) => {
         if (authLoading) return;
 
         if (user) {
+            lastWorkspaceRef.current = user.lastWorkspace || null;
             fetchWorkspaces();
         } else {
+            lastWorkspaceRef.current = null;
             setWorkspaces([]);
-            setActiveWorkspace(null);
+            applyActiveWorkspace(null);
         }
     }, [user, authLoading]);
 
